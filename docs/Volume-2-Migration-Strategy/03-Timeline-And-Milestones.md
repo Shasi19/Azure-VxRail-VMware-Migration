@@ -37,38 +37,36 @@ Legend: ████=Critical Path   ▓▓▓▓=K8s Build   ▒▒▒▒=Middl
 ## Milestone Tracker
 
 ```mermaid
-timeline
-    title Migration Milestones Timeline
-    section Q1 2024
-        Week 1  : 🚀 Project Kickoff
-                : Team assembled
-                : Budget approved
-        Week 4  : 📋 Procurement Complete
-                : Hardware ordered
-                : Licenses purchased
-        Week 8  : 🏗️ Infrastructure Ready
-                : Network live
-                : VMware cluster up
-    section Q2 2024
-        Week 12 : ⚙️ Middleware Ready
-                : Vault deployed
-                : Harbor running
-                : F5 configured
-        Week 16 : ☸️ Kubernetes Ready
-                : K8s cluster healthy
-                : Apps containerized
-                : GitOps live
-        Week 20 : ✅ UAT Sign-off
-                : All tests passed
-                : Stakeholder approval
-    section Q2-Q3 2024
-        Week 22 : 🚢 GO-LIVE
-                : DNS cutover done
-                : Azure in standby
-        Week 26 : 🎯 Project Complete
-                : Azure decommissioned
-                : Team handed over
+gantt
+    title Migration Milestone Timeline
+    dateFormat  YYYY-MM-DD
+    axisFormat  W%W
+
+    section Q1 2024 — Foundation
+    Project Kickoff          :milestone, m1, 2024-01-01, 0d
+    Procurement Complete     :milestone, m2, 2024-01-29, 0d
+    Infrastructure Ready     :milestone, m3, 2024-02-26, 0d
+
+    section Q2 2024 — Platform
+    Middleware Ready         :milestone, m4, 2024-03-25, 0d
+    Kubernetes Ready         :milestone, m5, 2024-04-22, 0d
+    UAT Sign-off             :milestone, m6, 2024-05-20, 0d
+
+    section Q2-Q3 2024 — Go-Live
+    GO-LIVE                  :crit, milestone, m7, 2024-05-24, 0d
+    Project Complete         :milestone, m8, 2024-06-24, 0d
 ```
+
+| Week | Milestone | Deliverables |
+|------|-----------|-------------|
+| W1 | Project Kickoff | Team assembled, budget approved |
+| W4 | Procurement Complete | Hardware ordered, licenses purchased |
+| W8 | Infrastructure Ready | Network live, VMware cluster up |
+| W12 | Middleware Ready | Vault deployed, Harbor, F5 configured |
+| W16 | Kubernetes Ready | K8s cluster healthy, apps containerized, GitOps live |
+| W20 | UAT Sign-off | All tests passed, stakeholder approval |
+| **W22** | **GO-LIVE** | **DNS cutover done, Azure on standby** |
+| W26 | Project Complete | Azure decommissioned, team handed over |
 
 ---
 

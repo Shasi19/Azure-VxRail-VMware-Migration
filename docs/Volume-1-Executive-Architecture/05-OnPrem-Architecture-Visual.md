@@ -9,120 +9,80 @@
 
 ```mermaid
 graph TB
-    subgraph USERS["👥 End Users"]
-        U1[🌍 Internet Users]
-        U2[🏢 Corporate Users\nDirect LAN]
+    INET[Internet Users] --> ISP1 & ISP2
+    CORP[Corporate LAN Users] --> SW
+
+    subgraph SECURITY["Security Layer  VLAN 20: 10.0.2.0/24"]
+        ISP1[ISP Link 1 - 1Gbps Primary] --> FW
+        ISP2[ISP Link 2 - 1Gbps Failover] --> FW
+        FW[Palo Alto PA-5250 NGFW\nHA Active/Passive\n6 Security Zones]
+        FW --> F5
+        F5[F5 BIG-IP 5200\nVIP: 10.0.2.10\nSSL Offload / HA]
     end
 
-    subgraph ISP_LAYER["🌐 Internet Connectivity"]
-        ISP1[ISP Link 1\n1 Gbps Primary]
-        ISP2[ISP Link 2\n1 Gbps Failover]
+    subgraph NETWORK["Network Core"]
+        SW[Cisco Nexus 9372PX\nVPC Pair / VLANs 10-90]
     end
 
-    subgraph DMZ["🔒 Security Layer — DMZ (VLAN 20: 10.0.2.0/24)"]
-        FW["🛡️ Palo Alto PA-5250 NGFW\n• Active/Passive HA Pair\n• 100 Gbps throughput\n• NGFW + IPS + AV + SSL Inspection\n• DPI | Web Filtering | App Control\n• Zone-based security policy\n• 6 security zones defined"]
-        F5["⚖️ F5 BIG-IP 5200\n• Active/Passive HA (VRRP)\n• VIP: 10.0.2.10:443\n• SSL/TLS offloading\n• Least-connections LB\n• Health check: /health\n• Failover < 3 seconds"]
-    end
-
-    subgraph NETWORK["🔀 Network Core"]
-        CS["🔀 Cisco Nexus 9372PX\n• VPC Pair (2 switches)\n• 14.4 Tbps throughput\n• L3 routing + OSPF\n• VLANs 10–90\n• < 1µs latency"]
-        AS["📡 Cisco Nexus 9348\n• 4× Access Switches\n• 25.6 Tbps each\n• Trunk to core"]
-    end
-
-    subgraph K8S_CONTROL["☸️ Kubernetes Control Plane (VLAN 30: 10.0.3.0/24)"]
-        CP1["🎛️ k8s-master-1\n10.0.3.11"]
-        CP2["🎛️ k8s-master-2\n10.0.3.12"]
-        CP3["🎛️ k8s-master-3\n10.0.3.13"]
-        ETCD["📦 etcd Cluster\n3-node HA"]
-        INGRESS["🚪 NGINX Ingress\n+ MetalLB\nVIP: 10.0.4.200"]
-    end
-
-    subgraph K8S_WORKERS["☸️ Kubernetes Workers (VLAN 40: 10.0.4.0/24)"]
-        W1["💻 worker-1\n10.0.4.21\n56-core | 512GB"]
-        W2["💻 worker-2\n10.0.4.22\n56-core | 512GB"]
-        W3["💻 worker-3\n10.0.4.23\n56-core | 512GB"]
-        W4["💻 worker-4\n10.0.4.24\n56-core | 512GB"]
-        W5["💻 worker-5\n10.0.4.25\n56-core | 512GB"]
-        W6["💻 worker-6\n10.0.4.26\n56-core | 512GB"]
-
-        subgraph WORKLOADS["Application Workloads (Helm + ArgoCD)"]
-            APP["📦 WebApp Pods\nReplicas: 3 → 5 (HPA)\n2 vCPU / 3Gi each"]
-            JOBS["⚙️ K8s CronJobs\nBatch / ETL\n(replaces ACI)"]
+    subgraph K8S["Kubernetes Cluster  VLAN 30-40"]
+        subgraph CP["Control Plane  10.0.3.x"]
+            M1[master-1\n10.0.3.11]
+            M2[master-2\n10.0.3.12]
+            M3[master-3\n10.0.3.13]
+        end
+        INGR[NGINX Ingress\nMetalLB 10.0.4.200]
+        subgraph PODS["Worker Nodes  10.0.4.x - 6 nodes"]
+            APP[WebApp Pods\nHPA 2-5 replicas]
+            JOBS[CronJobs\nBatch / ETL]
         end
     end
 
-    subgraph DATA["💾 Data Layer (VLAN 50: 10.0.5.0/24)"]
-        PG1[("🗄️ PostgreSQL PRIMARY\nPatroni Leader\n10.0.5.1\nPG 15 | 56-core | 1TB RAM")]
-        PG2[("🗄️ PostgreSQL STANDBY-1\nPatroni Follower\n10.0.5.2\nStreaming Replication")]
-        PG3[("🗄️ PostgreSQL STANDBY-2\nPatroni Follower\n10.0.5.3\nRead Replica")]
-        ETCD_DB["📦 etcd (Patroni DCS)\n3 nodes: 10.0.5.11-13"]
-        HAP["⚖️ HAProxy\nVIP: 10.0.5.100\nPort 5432: Primary R/W\nPort 5433: Replicas R/O"]
-        PGB["🔄 PgBouncer\nConnection Pool\n400 max connections\nTransaction mode"]
-        REDIS["⚡ Redis Cluster\n3 masters + 3 replicas\n6 GB total\nAOF persistence + TLS"]
+    subgraph DATA["Data Layer  VLAN 50: 10.0.5.0/24"]
+        HAP[HAProxy VIP 10.0.5.100\nPort 5432 Primary / 5433 Replica]
+        PGB[PgBouncer Pool\nPort 6432]
+        PG1[(PostgreSQL Primary\nPatroni Leader 10.0.5.1)]
+        PG2[(PostgreSQL Standby-1\n10.0.5.2)]
+        PG3[(PostgreSQL Standby-2\n10.0.5.3)]
+        REDIS[Redis Cluster\n3+3 nodes / 6GB]
     end
 
-    subgraph STORAGE["📁 Storage (VLAN 60: 10.0.6.0/24)"]
-        NAS["🗂️ NetApp AFF A250\n• 10 TB usable NVMe\n• NFS + iSCSI\n• HA Pair\n• Daily snapshots 30-day"]
-        MINIO["📦 MinIO Distributed\n• 4-node cluster\n• S3-compatible API\n• Replaces Azure Blob\n• Buckets: app-data, backup, logs"]
+    subgraph STORAGE["Storage  VLAN 60"]
+        NAS[NetApp AFF A250\n10TB NVMe / HA Pair]
+        MINIO[MinIO Distributed\n4-node / S3 API]
     end
 
-    subgraph MONITORING["📊 Monitoring (VLAN 70: 10.0.7.0/24)"]
-        PROM["📈 Prometheus\n• 30-day retention\n• 50 GB storage\n• 15-sec scrape\n• HA: 2 replicas"]
-        GRAF["📊 Grafana\n• LDAP auth\n• 10+ dashboards\n• Infra, K8s, App, DB"]
-        AM["🔔 Alertmanager\n• PagerDuty routing\n• Slack integration\n• Email alerts\n• 15+ alert rules"]
-        ELK["📋 ELK Stack\n• Elasticsearch 3-node\n• Logstash pipelines\n• Kibana dashboards\n• Filebeat on all nodes"]
-        JAEGER["🔍 Jaeger Tracing\n• Distributed traces\n• Replaces App Insights"]
+    subgraph OBS["Observability  VLAN 70"]
+        PROM[Prometheus\n30d retention]
+        GRAF[Grafana\n10+ dashboards]
+        ELK[ELK Stack\nElastic + Kibana]
     end
 
-    subgraph MGMT["⚙️ Management (VLAN 80: 10.0.8.0/24)"]
-        VAULT["🔑 HashiCorp Vault\n• 3-node HA cluster\n• K8s auth method\n• DB secret rotation\n• PKI engine (TLS certs)\n• Replaces Azure Key Vault"]
-        ARGO["🔄 ArgoCD\n• GitOps continuous deploy\n• Sync from GitLab repo\n• Auto-heal + prune"]
-        HARBOR["🐳 Harbor Registry\n• Private container registry\n• Trivy vuln scanning\n• LDAP auth\n• Replaces Azure ACR"]
-        GITLAB["🦊 GitLab CI/CD\n• Build pipelines\n• Test automation\n• Image build + push"]
+    subgraph MGMT["Management  VLAN 80"]
+        VAULT[HashiCorp Vault\n3-node HA]
+        ARGO[ArgoCD\nGitOps]
+        HARBOR[Harbor Registry\nTrivy scanning]
     end
 
-    subgraph BACKUP["💿 Backup (VLAN 90: 10.0.9.0/24)"]
-        BACULA["🔄 Bacula\n• Daily full backup 2 AM\n• 30-day retention\n• Geo-copy to remote site"]
-        VELERO["☸️ Velero\n• K8s namespace backup\n• PV snapshot backup\n• Scheduled daily"]
-    end
-
-    U1 --> ISP1 & ISP2
-    ISP1 & ISP2 --> FW
-    FW --> F5
-    F5 <-->|management| CS
-    CS --> AS
-    AS --> CP1 & CP2 & CP3
-    AS --> W1 & W2 & W3 & W4 & W5 & W6
-    F5 --> INGRESS
-    INGRESS --> APP
+    F5 --> INGR --> APP
+    SW --> M1 & M2 & M3
+    SW --> PODS
     APP --> PGB --> HAP --> PG1
-    PG1 -->|stream replication| PG2 & PG3
-    ETCD_DB -.->|DCS| PG1 & PG2 & PG3
-    APP --> REDIS
-    APP --> MINIO
-    NAS -->|NFS mounts| W1 & W2 & W3 & W4 & W5 & W6
-    APP -->|metrics| PROM
-    APP -->|logs| ELK
-    APP -->|traces| JAEGER
-    PROM --> GRAF & AM
-    VAULT -->|inject secrets| APP
-    ARGO -->|deploy| APP & JOBS
-    HARBOR -->|images| APP
-    GITLAB -->|push images| HARBOR
-    BACULA -->|backup| PG1 & MINIO & NAS
-    VELERO -->|backup| APP & JOBS
+    PG1 -->|streaming replication| PG2 & PG3
+    APP --> REDIS & MINIO
+    NAS -.->|NFS| PODS
+    APP --> PROM --> GRAF
+    APP --> ELK
+    VAULT -.->|inject secrets| APP
+    ARGO -.->|deploy| APP & JOBS
+    HARBOR -.->|images| APP
 
-    style USERS fill:#e3f2fd,stroke:#1565c0
-    style ISP_LAYER fill:#ede7f6,stroke:#4527a0
-    style DMZ fill:#fce4ec,stroke:#880e4f
+    style SECURITY fill:#fce4ec,stroke:#880e4f
     style NETWORK fill:#e8eaf6,stroke:#283593
-    style K8S_CONTROL fill:#e8f5e9,stroke:#1b5e20
-    style K8S_WORKERS fill:#f1f8e9,stroke:#33691e
+    style K8S fill:#e8f5e9,stroke:#1b5e20
     style DATA fill:#fff3e0,stroke:#e65100
-    style STORAGE fill:#fafafa,stroke:#424242
-    style MONITORING fill:#f3e5f5,stroke:#4a148c
+    style STORAGE fill:#f5f5f5,stroke:#616161
+    style OBS fill:#f3e5f5,stroke:#6a1b9a
     style MGMT fill:#e0f7fa,stroke:#006064
-    style BACKUP fill:#efebe9,stroke:#3e2723
 ```
 
 ---
@@ -131,7 +91,7 @@ graph TB
 
 ```mermaid
 graph LR
-    subgraph AZURE_COL["☁️ Azure (Current)"]
+    subgraph AZURE_COL["Azure Current"]
         AZ1["Azure Front Door\n+ WAF"]
         AZ2["Application Gateway\nWAF_v2"]
         AZ3["App Service 3×P1V2\n.NET on Windows"]
@@ -145,10 +105,10 @@ graph LR
         AZ11["Azure DevOps\nCI/CD"]
     end
 
-    subgraph ONPREM_COL["🏢 On-Premises (Target)"]
+    subgraph ONPREM_COL["On-Premises Target"]
         OP1["Palo Alto PA-5250\nNGFW HA Pair"]
         OP2["F5 BIG-IP 5200\nActive/Passive HA"]
-        OP3["K8s Pods\n.NET on Linux\nHPA 2–5 replicas"]
+        OP3["K8s Pods\n.NET on Linux\nHPA 2-5 replicas"]
         OP4["PostgreSQL 15\nPatroni HA | 3-node"]
         OP5["Redis Cluster\n3+3 nodes | 6 GB"]
         OP6["MinIO Distributed\n10 TB NVMe NAS"]
@@ -180,30 +140,31 @@ graph LR
 ## On-Premises Network VLAN Map
 
 ```mermaid
-graph TB
-    subgraph VLANS["🔀 VLAN Segmentation"]
-        V10["VLAN 10 — Management\n10.0.1.0/24\nvCenter | IPMI | OOB\nSwitches | Bastion"]
-        V20["VLAN 20 — DMZ\n10.0.2.0/24\nPalo Alto NGFW\nF5 BIG-IP VIP: 10.0.2.10"]
-        V30["VLAN 30 — K8s Control\n10.0.3.0/24\nMaster-1/2/3\netcd cluster"]
-        V40["VLAN 40 — K8s Workers\n10.0.4.0/24\nWorker-1 to 6\nMetalLB: 10.0.4.200-220"]
-        V50["VLAN 50 — Database\n10.0.5.0/24\nPostgreSQL Primary/Standby\nRedis Cluster\nHAProxy VIP: 10.0.5.100"]
-        V60["VLAN 60 — Storage\n10.0.6.0/24\nNetApp NAS\nMinIO Cluster"]
-        V70["VLAN 70 — Monitoring\n10.0.7.0/24\nPrometheus | Grafana\nELK | Jaeger"]
-        V80["VLAN 80 — CI/CD & Mgmt\n10.0.8.0/24\nGitLab | ArgoCD\nHarbor Registry | Vault"]
-        V90["VLAN 90 — Backup\n10.0.9.0/24\nBacula Server\nVelero"]
-    end
+graph LR
+    V10[VLAN 10 Management\n10.0.1.0/24\nvCenter / IPMI / Bastion]
+    V20[VLAN 20 DMZ\n10.0.2.0/24\nNGFW / F5 VIP 10.0.2.10]
+    V30[VLAN 30 K8s Control\n10.0.3.0/24\nMasters 1-3 / etcd]
+    V40[VLAN 40 K8s Workers\n10.0.4.0/24\nWorkers 1-6\nMetalLB 10.0.4.200]
+    V50[VLAN 50 Database\n10.0.5.0/24\nPostgreSQL / Redis\nHAProxy 10.0.5.100]
+    V60[VLAN 60 Storage\n10.0.6.0/24\nNetApp NAS / MinIO]
+    V70[VLAN 70 Monitoring\n10.0.7.0/24\nPrometheus / Grafana\nELK / Jaeger]
+    V80[VLAN 80 CI/CD\n10.0.8.0/24\nGitLab / ArgoCD\nHarbor / Vault]
+    V90[VLAN 90 Backup\n10.0.9.0/24\nBacula / Velero]
 
-    V10 -->|admin access| V20 & V30 & V40 & V50 & V60 & V70 & V80 & V90
-    V20 -->|port 8080/8443| V40
-    V40 -->|port 5432 pgsql| V50
-    V40 -->|port 6379 redis| V50
+    V10 -->|admin SSH/HTTPS| V20
+    V10 -->|admin SSH/HTTPS| V30
+    V10 -->|admin SSH/HTTPS| V40
+    V10 -->|admin SSH/HTTPS| V50
+    V20 -->|port 8080| V40
+    V40 -->|port 5432| V50
+    V40 -->|port 6379| V50
     V40 -->|NFS 2049| V60
     V40 -->|metrics 9090| V70
     V40 -->|logs 5044| V70
     V80 -->|deploy| V40
-    V90 -->|backup pull| V50 & V60
+    V90 -->|backup pull| V50
+    V90 -->|backup pull| V60
 
-    style VLANS fill:#fafafa,stroke:#424242
     style V10 fill:#607d8b,color:#fff
     style V20 fill:#c62828,color:#fff
     style V30 fill:#1565c0,color:#fff

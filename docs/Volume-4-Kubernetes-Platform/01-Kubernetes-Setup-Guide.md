@@ -32,14 +32,14 @@ graph TB
         end
 
         subgraph NAMESPACES["Namespaces"]
-            NS1["📁 production\n• webapp (3–5 pods)\n• cronjobs"]
-            NS2["📁 staging\n• webapp (1–2 pods)"]
-            NS3["📁 monitoring\n• Prometheus\n• Grafana\n• Alertmanager"]
-            NS4["📁 logging\n• Elasticsearch\n• Logstash\n• Kibana\n• Filebeat"]
-            NS5["📁 argocd\n• ArgoCD server"]
-            NS6["📁 vault\n• Vault agent injector"]
-            NS7["📁 ingress-nginx\n• NGINX ingress controller"]
-            NS8["📁 cert-manager\n• cert-manager"]
+            NS1["📁 production\n- webapp (3–5 pods)\n- cronjobs"]
+            NS2["📁 staging\n- webapp (1–2 pods)"]
+            NS3["📁 monitoring\n- Prometheus\n- Grafana\n- Alertmanager"]
+            NS4["📁 logging\n- Elasticsearch\n- Logstash\n- Kibana\n- Filebeat"]
+            NS5["📁 argocd\n- ArgoCD server"]
+            NS6["📁 vault\n- Vault agent injector"]
+            NS7["📁 ingress-nginx\n- NGINX ingress controller"]
+            NS8["📁 cert-manager\n- cert-manager"]
         end
     end
 

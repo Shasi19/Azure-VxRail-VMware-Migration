@@ -100,19 +100,19 @@
 graph LR
     subgraph K8S_NODES["Kubernetes Nodes (9× Dell R750)"]
         subgraph MASTERS["Masters — 3 nodes"]
-            M_SPEC["🎛️ Spec per master:\n• 2× Intel Xeon Gold 6338\n  (32-core, 2.0GHz)\n• 256 GB DDR4-3200 ECC\n• 2× 960GB NVMe SSD\n• 2× 25GbE NIC\n• 1× IPMI management\nOS: Ubuntu 22.04 LTS"]
+            M_SPEC["🎛️ Spec per master:\n- 2× Intel Xeon Gold 6338\n  (32-core, 2.0GHz)\n- 256 GB DDR4-3200 ECC\n- 2× 960GB NVMe SSD\n- 2× 25GbE NIC\n- 1× IPMI management\nOS: Ubuntu 22.04 LTS"]
         end
         subgraph WORKERS["Workers — 6 nodes"]
-            W_SPEC["💻 Spec per worker:\n• 2× Intel Xeon Gold 6338\n  (32-core, 2.0GHz)\n• 512 GB DDR4-3200 ECC\n• 2× 1.92TB NVMe SSD\n• 2× 25GbE NIC\n• 1× IPMI management\nOS: Ubuntu 22.04 LTS"]
+            W_SPEC["💻 Spec per worker:\n- 2× Intel Xeon Gold 6338\n  (32-core, 2.0GHz)\n- 512 GB DDR4-3200 ECC\n- 2× 1.92TB NVMe SSD\n- 2× 25GbE NIC\n- 1× IPMI management\nOS: Ubuntu 22.04 LTS"]
         end
     end
 
     subgraph DB_NODES["Database Nodes (2× Dell R750)"]
-        DB_SPEC["🗄️ Spec per DB server:\n• 2× Intel Xeon Gold 6338\n  (32-core, 2.0GHz)\n• 1 TB DDR4-3200 ECC\n• 4× 3.84TB NVMe SSD\n• 2× 25GbE NIC\n• 1× IPMI management\nOS: Ubuntu 22.04 LTS"]
+        DB_SPEC["🗄️ Spec per DB server:\n- 2× Intel Xeon Gold 6338\n  (32-core, 2.0GHz)\n- 1 TB DDR4-3200 ECC\n- 4× 3.84TB NVMe SSD\n- 2× 25GbE NIC\n- 1× IPMI management\nOS: Ubuntu 22.04 LTS"]
     end
 
     subgraph MGMT_NODE["Management Server (1× Dell R750)"]
-        M_MGMT["⚙️ Spec:\n• 2× Intel Xeon Silver 4316\n• 128 GB DDR4\n• 2× 960GB SSD\n• vCenter, DNS, Vault\nOS: Ubuntu 22.04 LTS"]
+        M_MGMT["⚙️ Spec:\n- 2× Intel Xeon Silver 4316\n- 128 GB DDR4\n- 2× 960GB SSD\n- vCenter, DNS, Vault\nOS: Ubuntu 22.04 LTS"]
     end
 
     style K8S_NODES fill:#e3f2fd,stroke:#1565c0

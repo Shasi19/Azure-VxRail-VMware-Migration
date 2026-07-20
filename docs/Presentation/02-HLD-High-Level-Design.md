@@ -40,10 +40,10 @@ graph TB
         C_DR["Azure Backup\n+ Site Recovery"]
 
         C_EDGE --> C_LB --> C_APP
-        C_APP --> C_DB & C_CACHE & C_STORE
+        C_APP --> C_DB and C_CACHE and C_STORE
         C_APP --> C_MON
-        C_SEC -.->|secures| C_APP & C_DB
-        C_DR -.->|protects| C_DB & C_STORE
+        C_SEC -.->|secures| C_APP and C_DB
+        C_DR -.->|protects| C_DB and C_STORE
     end
 
     subgraph TARGET["🏢 TARGET STATE — On-Premises"]
@@ -59,10 +59,10 @@ graph TB
         T_DR["Bacula + Velero\nDaily + WAL Archive\nRTO < 5min | RPO < 1min"]
 
         T_FW --> T_LB --> T_K8S
-        T_K8S --> T_DB & T_CACHE & T_STORE
+        T_K8S --> T_DB and T_CACHE and T_STORE
         T_K8S --> T_MON
-        T_SEC -.->|secures| T_K8S & T_DB
-        T_DR -.->|protects| T_DB & T_STORE
+        T_SEC -.->|secures| T_K8S and T_DB
+        T_DR -.->|protects| T_DB and T_STORE
     end
 
     CURRENT -->|"26-Week\nMigration"| TARGET
@@ -135,7 +135,7 @@ graph TB
             CP_A["K8s Master-1\n🟢 etcd Leader"]
             CP_B["K8s Master-2\n🔵 etcd Follower"]
             CP_C["K8s Master-3\n🔵 etcd Follower"]
-            CP_A <-->|"Raft Consensus\nAuto-elect on failure"| CP_B & CP_C
+            CP_A <-->|"Raft Consensus\nAuto-elect on failure"| CP_B and CP_C
 
             W_POOL["Worker Pool\n6 Nodes (W1–W6)\nPod anti-affinity\nspreads pods"]
         end
@@ -144,9 +144,9 @@ graph TB
             DB_P["PostgreSQL Primary\n🟢 Leader"]
             DB_S1["PostgreSQL Standby-1\n🔵 Sync Replica"]
             DB_S2["PostgreSQL Standby-2\n🔵 Async Replica"]
-            DB_P -->|"Streaming Replication\nLag < 100ms"| DB_S1 & DB_S2
+            DB_P -->|"Streaming Replication\nLag < 100ms"| DB_S1 and DB_S2
             ETCD_C["etcd DCS\n3-node\nLeader election"]
-            ETCD_C -.->|"Patroni failover\n< 30 seconds"| DB_P & DB_S1 & DB_S2
+            ETCD_C -.->|"Patroni failover\n< 30 seconds"| DB_P and DB_S1 and DB_S2
         end
 
         subgraph TIER4["Tier 4: Storage — HA"]
@@ -216,7 +216,7 @@ graph TB
         L4["Layer 4: Network Segmentation\n9 VLANs | Zero-trust between segments\nFirewall rules per flow"]
         L5["Layer 5: K8s Security\nNetwork Policies (Calico)\nPod Security Standards\nService Account + RBAC\nread-only root filesystem"]
         L6["Layer 6: App Security\nHashiCorp Vault (secrets)\nDynamic DB credentials\nTLS everywhere (cert-manager)\nmTLS between services"]
-        L7["Layer 7: Audit & SIEM\nWazuh SIEM\nImmutable audit logs\nAnomalous behavior detection\nPagerDuty alerting"]
+        L7["Layer 7: Audit and SIEM\nWazuh SIEM\nImmutable audit logs\nAnomalous behavior detection\nPagerDuty alerting"]
     end
 
     INT --> L1 --> L2 --> L3 --> L4 --> L5 --> L6

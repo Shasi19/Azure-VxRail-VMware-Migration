@@ -126,13 +126,13 @@ flowchart LR
 ```mermaid
 graph LR
     subgraph S1["🏗️ Stage 1: Foundation (Weeks 1–8)"]
-        T1A[Procurement\n& Planning] --> T1B[Hardware\nInstallation]
+        T1A[Procurement\nand Planning] --> T1B[Hardware\nInstallation]
         T1B --> T1C[Network\nConfiguration]
         T1C --> T1D[Virtualization\nSetup]
     end
     subgraph S2["⚙️ Stage 2: Platform (Weeks 9–16)"]
         T2A[Kubernetes\nCluster] --> T2B[PostgreSQL\nHA Setup]
-        T2B --> T2C[Redis &\nMinIO]
+        T2B --> T2C[Redis and\nMinIO]
         T2C --> T2D[Monitoring\nStack]
     end
     subgraph S3["🚀 Stage 3: Migration (Weeks 17–26)"]
