@@ -8,151 +8,136 @@
 ### Azure Services Inventory
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│          AZURE CLOUD INFRASTRUCTURE                     │
-├─────────────────────────────────────────────────────────┤
-│                                                         │
-│  ┌──────────────────────────────────────────────────┐  │
-│  │  PRESENTATION TIER                               │  │
-│  │  ├─ Azure Front Door (Global CDN)               │  │
-│  │  ├─ Azure Application Gateway                    │  │
-│  │  └─ Web Application Firewall                     │  │
-│  └──────────────────────────────────────────────────┘  │
-│                      │                                  │
-│  ┌──────────────────▼──────────────────────────────┐  │
-│  │  APPLICATION TIER                                │  │
-│  │  ├─ App Service (3x P1V2 instances)             │  │
-│  │  ├─ Autoscaling (Min: 2, Max: 5)               │  │
-│  │  ├─ Managed Identity                            │  │
-│  │  └─ Application Insights                        │  │
-│  └──────────────────────────────────────────────────┘  │
-│                      │                                  │
-│  ┌──────────────────▼──────────────────────────────┐  │
-│  │  DATA TIER                                       │  │
-│  │  ├─ PostgreSQL Database (Managed)              │  │
-│  │  ├─ Storage Accounts (Blob, File, Queue)       │  │
-│  │  ├─ Redis Cache                                 │  │
-│  │  └─ Cosmos DB (Optional)                        │  │
-│  └──────────────────────────────────────────────────┘  │
-│                      │                                  │
-│  ┌──────────────────▼──────────────────────────────┐  │
-│  │  MANAGEMENT & SECURITY                          │  │
-│  │  ├─ Azure Monitor & Log Analytics              │  │
-│  │  ├─ Azure Security Center                       │  │
-│  │  ├─ Azure Key Vault                             │  │
-│  │  ├─ Azure Sentinel                              │  │
-│  │  └─ Azure Policy                                │  │
-│  └──────────────────────────────────────────────────┘  │
-│                      │                                  │
-│  ┌──────────────────▼──────────────────────────────┐  │
-│  │  BACKUP & DISASTER RECOVERY                     │  │
-│  │  ├─ Azure Backup                                │  │
-│  │  ├─ Azure Site Recovery                         │  │
-│  │  ├─ Geo-redundant Storage                       │  │
-│  │  └─ Backup Vault                                │  │
-│  └──────────────────────────────────────────────────┘  │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│   AZURE CLOUD INFRASTRUCTURE  (Hub-and-Spoke, West Europe)              │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│   Sub-AFRPS-AF-INT  ─  Hub Subscription (Centralised Connectivity)      │
+│   UDR Route Tables on all workload VNets → Hub                          │
+│                                                                         │
+│  ┌──────────────────────────────────────────────────────────────────┐   │
+│  │  rg-ae-prod-we-001   (VNet 1)                                    │   │
+│  │  ├─ Azure Kubernetes Service (AKS) + UDR                        │   │
+│  │  ├─ Azure Container Registry (ACR) + UDR                        │   │
+│  │  ├─ Azure Container Instances (Batch/ETL) + UDR                 │   │
+│  │  ├─ Storage Account + UDR                                       │   │
+│  │  └─ Azure Database for PostgreSQL + UDR                         │   │
+│  └──────────────────────────────────────────────────────────────────┘   │
+│                                                                         │
+│  ┌──────────────────────────────────────────────────────────────────┐   │
+│  │  rg-cv-prod-we-001   (VNet 2)                                    │   │
+│  │  ├─ Azure Kubernetes Service (AKS)                              │   │
+│  │  ├─ Azure Container Registry (ACR)                              │   │
+│  │  ├─ Storage Account                                             │   │
+│  │  └─ Azure Database for PostgreSQL                               │   │
+│  └──────────────────────────────────────────────────────────────────┘   │
+│                                                                         │
+│  ┌──────────────────────────────────────────────────────────────────┐   │
+│  │  rg-as-las-we-001   (VNet 3)                                     │   │
+│  │  ├─ Azure Kubernetes Service (AKS) + UDR                        │   │
+│  │  ├─ Azure Container Registry (ACR) + UDR                        │   │
+│  │  ├─ Azure Container Instances + UDR                             │   │
+│  │  ├─ Storage Account + UDR                                       │   │
+│  │  └─ Azure Database for PostgreSQL + UDR                         │   │
+│  └──────────────────────────────────────────────────────────────────┘   │
+│                                                                         │
+│  ┌──────────────────────────────────────────────────────────────────┐   │
+│  │  rg-dls-coe-we-001   (VNet 4 — Shared Services / CoE)           │   │
+│  │  ├─ Azure Database for PostgreSQL (shared/CoE instance)         │   │
+│  │  ├─ UDR Route Table                                             │   │
+│  │  ├─ Azure Monitor                                               │   │
+│  │  └─ Application Insights                                        │   │
+│  └──────────────────────────────────────────────────────────────────┘   │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
 ## Component Details
 
-### 1. Presentation Layer
+### 1. Compute Layer — Azure Kubernetes Service (AKS)
 
-#### Azure Front Door
+Each of the three workload VNets (rg-ae-prod-we-001, rg-cv-prod-we-001, rg-as-las-we-001) runs a dedicated AKS cluster.
 
-```
-Configuration:
-├─ Global entry point
-├─ CDN: Enabled
-├─ WAF: Enabled (OWASP 3.0)
-├─ DDoS Protection: Standard
-├─ SSL/TLS: 1.2+
-├─ Geo-routing: Multi-region
-└─ Caching: 24 hours
-
-Capabilities:
-├─ Global load balancing
-├─ Automatic failover
-├─ SSL acceleration
-├─ Path-based routing
-├─ Custom domain support
-└─ Rate limiting
-```
-
-#### Azure Application Gateway
+#### Azure Kubernetes Service (per workload VNet)
 
 ```
 Configuration:
-├─ SKU: WAF_v2
-├─ Instances: 2 (minimum)
-├─ Capacity: 50 units
-├─ Autoscaling: Yes (2-10)
-├─ Backend pool: 3 App Services
-├─ Health probe: /health
-├─ Timeout: 30 seconds
-└─ Cookie affinity: Enabled
+├─ Kubernetes Version: 1.28+
+├─ Node Pool: System + User node pools
+├─ VM SKU: Standard_D4s_v3 (typical)
+├─ Auto-scaling: Enabled (Min: 2, Max: 5 nodes)
+├─ Networking: Azure CNI + UDR routing to hub
+├─ Managed Identity: Enabled (pod identity)
+├─ Container Registry: Linked ACR per VNet
+└─ RBAC: Azure AD integrated
 
-Features:
-├─ L7 load balancing
-├─ SSL termination
-├─ Path-based routing
-├─ Host-based routing
-├─ Web Application Firewall
-├─ Request rewrite rules
-└─ URL path maps
+Workloads:
+├─ Application Pods (web-facing, auto-scaled)
+├─ CronJob Pods (batch / ETL)
+└─ Internal services / sidecars
 ```
 
-### 2. Application Layer
-
-#### Azure App Service
+#### Azure Container Instances (Batch / ETL)
 
 ```
-Configuration:
-├─ Service Plan: Premium (P1V2)
-├─ Instances: 3 (running)
-├─ CPU: 2 cores per instance
-├─ Memory: 3.5 GB per instance
-├─ Storage: 250 GB per instance
-├─ OS: Windows Server 2019
-├─ Runtime: .NET Framework 4.8
-└─ Always On: Enabled
-
-Autoscaling:
-├─ Min Instances: 2
-├─ Max Instances: 5
-├─ Scale-out Threshold: 70% CPU
-├─ Scale-in Threshold: 30% CPU
-├─ Cooldown Period: 5 minutes
-└─ Metric: Average CPU
-
-Monitoring:
-├─ Application Insights: Connected
-├─ Diagnostics: Enabled
-├─ Continuous Deployment: Yes
-├─ Deployment Slots: 3 (prod, staging, test)
-└─ Alert Rules: 5 active
-```
-
-#### Azure Container Instances
-
-```
-Usage:
-├─ Purpose: Ad-hoc batch jobs
+Usage (rg-ae-prod-we-001, rg-as-las-we-001):
+├─ Purpose: Ad-hoc batch jobs and ETL pipelines
 ├─ Frequency: Daily scheduled tasks
 ├─ Typical Duration: 5-30 minutes
 ├─ Memory: 1-4 GB per container
 ├─ CPU: 1-4 cores per container
 ├─ Storage: Ephemeral (temporary)
-└─ Network: Virtual Network integrated
+└─ Network: Virtual Network integrated (UDR)
 
 Current Workloads:
 ├─ Report Generation (daily)
 ├─ Data Export (hourly)
 ├─ Cache Warming (on-demand)
 └─ ETL Processes (nightly)
+```
+
+#### Azure Container Registry (ACR)
+
+```
+One ACR per workload VNet:
+├─ SKU: Standard / Premium
+├─ Geo-replication: Not enabled (single region)
+├─ Image scanning: Microsoft Defender for Containers
+├─ Private endpoint: VNet-integrated
+├─ Admin account: Disabled (Managed Identity access)
+└─ Webhook: Enabled for CD triggers
+```
+
+### 2. Networking — Hub and Spoke
+
+#### Hub Subscription: Sub-AFRPS-AF-INT
+
+```
+Role: Centralised network connectivity hub
+├─ UDR (User Defined Routes) pushed to all spoke VNets
+├─ Forces egress traffic through hub (inspect / log)
+├─ Provides shared connectivity services
+└─ Peering with each workload VNet (Spoke)
+
+Topology:
+├─ VNet Peering: Hub ↔ rg-ae-prod-we-001
+├─ VNet Peering: Hub ↔ rg-cv-prod-we-001
+├─ VNet Peering: Hub ↔ rg-as-las-we-001
+└─ VNet Peering: Hub ↔ rg-dls-coe-we-001
+```
+
+#### Virtual Networks (Workload Spokes)
+
+```
+Each workload VNet:
+├─ Region: West Europe
+├─ UDR: Applied to all subnets (route to hub)
+├─ NSG: Applied to AKS, Storage, DB subnets
+├─ Private Endpoints: PostgreSQL + Storage
+├─ DNS: Private DNS zones
+└─ Network Watcher: Enabled
 ```
 
 ### 3. Data Layer
@@ -258,40 +243,34 @@ Usage:
 #### Azure Virtual Network
 
 ```
-VNet Configuration:
-├─ Name: prod-vnet
-├─ Address Space: 10.0.0.0/16
-├─ Region: US East
-├─ Subnets: 4
-└─ DNS Servers: Azure-managed
+Four VNets, all in West Europe region:
 
-Subnets:
-├─ Front-end: 10.0.1.0/24 (Application Gateway)
-├─ App: 10.0.2.0/24 (App Services)
-├─ Data: 10.0.3.0/24 (Databases)
-└─ Mgmt: 10.0.4.0/24 (Management)
+VNet 1 — rg-ae-prod-we-001
+├─ Subnets: AKS, ACR, Storage, PostgreSQL
+├─ UDR: Applied to all subnets
+└─ Peered to: Sub-AFRPS-AF-INT hub
 
-Security:
-├─ Network Security Groups: 4
-├─ Route Tables: 2
+VNet 2 — rg-cv-prod-we-001
+├─ Subnets: AKS, ACR, Storage, PostgreSQL
+├─ UDR: Applied
+└─ Peered to: Sub-AFRPS-AF-INT hub
+
+VNet 3 — rg-as-las-we-001
+├─ Subnets: AKS, ACR, Storage, PostgreSQL
+├─ UDR: Applied to all subnets
+└─ Peered to: Sub-AFRPS-AF-INT hub
+
+VNet 4 — rg-dls-coe-we-001 (Shared Services)
+├─ Subnets: PostgreSQL, Monitoring
+├─ UDR: Applied
+└─ Peered to: Sub-AFRPS-AF-INT hub
+
+Security (all VNets):
+├─ Network Security Groups: Per subnet
+├─ Route Tables (UDR): Force-tunnel to hub
+├─ Private Endpoints: PostgreSQL + Storage
 ├─ Network Watchers: Enabled
-├─ Flow Logs: Enabled
-├─ DDoS Protection: Standard
-└─ Firewall: Not deployed
-```
-
-#### ExpressRoute / VPN
-
-```
-Connectivity:
-├─ VPN Gateway: Deployed
-├─ Type: Route-based
-├─ SKU: VpnGw1Az
-├─ Bandwidth: 650 Mbps
-├─ Connections: 2 (redundancy)
-├─ Local Network Gateway: Configured
-├─ Shared Key: Rotated annually
-└─ IKEv2: Enabled
+└─ Flow Logs: Enabled
 ```
 
 ### 5. Monitoring & Management

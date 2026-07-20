@@ -7,50 +7,74 @@
 
 ## Azure Architecture — Full Stack Diagram
 
+> **Note**: Architecture comprises 4 separate Virtual Networks across 4 Resource Groups, all connected via the `Sub-AFRPS-AF-INT` hub subscription. Each workload VNet contains its own AKS cluster, Storage Account, Container Registry, and PostgreSQL database. Monitoring and Observability resources are centralised in the shared RG `rg-dls-coe-we-001`.
+
 ```mermaid
 graph TB
-    U1[Global Users] --> AFD
-    U2[Corporate Users / VPN] --> VPN_GW
+    HUB[Sub-AFRPS-AF-INT\nHub / Shared Subscription]
 
-    subgraph EDGE["Azure Edge Layer"]
-        AFD[Azure Front Door\nGlobal CDN / WAF / DDoS\nSSL TLS 1.2+]
+    subgraph RG1["rg-ae-prod-we-001  West Europe"]
+        VNET1[Virtual Network]
+        AKS1[Azure Kubernetes Service\nUDR routed]
+        ACR1[Azure Container Registry\nUDR]
+        ACI1[Azure Container Instances\nBatch / ETL]
+        SA1[Storage Account\nUDR]
+        PG1[(Azure Database\nfor PostgreSQL\nUDR)]
     end
 
-    subgraph NETWORK["Azure Virtual Network  10.0.0.0/16"]
-        APPGW[Application Gateway WAF_v2\nSSL Offload / Path Routing\nSubnet: 10.0.1.0/24]
-        subgraph APP_TIER["App Tier  10.0.2.0/24"]
-            AS1[App Service 1\nP1V2 / 2vCPU / 3.5GB]
-            AS2[App Service 2\nP1V2 / 2vCPU / 3.5GB]
-            AS3[App Service 3\nP1V2 / 2vCPU / 3.5GB]
-            ACI[Container Instances\nBatch / ETL jobs]
-        end
-        subgraph DATA_TIER["Data Tier  10.0.3.0/24"]
-            PG[(PostgreSQL Managed\nPG 11 / 4vCore / 1TB\n2 Read Replicas)]
-            REDIS[Redis Cache Premium\n6 GB / Cluster / AOF]
-            BLOB[Storage Accounts\n3.5 TB total / RA-GRS]
-        end
-        VPN_GW[VPN Gateway\nVpnGw1Az / 650 Mbps]
+    subgraph RG2["rg-cv-prod-we-001  West Europe"]
+        VNET2[Virtual Network]
+        AKS2[Azure Kubernetes Service\nUDR routed]
+        ACR2[Azure Container Registry]
+        SA2[Storage Account]
+        PG2[(Azure Database\nfor PostgreSQL)]
     end
 
-    subgraph PLATFORM["Azure Platform Services"]
-        MON[Azure Monitor\n+ App Insights\n+ Log Analytics]
-        SEC[Key Vault / Security Center\n+ Azure Sentinel]
-        DR[Azure Backup\n+ Site Recovery]
+    subgraph RG3["rg-as-las-we-001  West Europe"]
+        VNET3[Virtual Network]
+        AKS3[Azure Kubernetes Service\nUDR routed]
+        ACR3[Azure Container Registry\nUDR]
+        ACI3[Azure Container Instances]
+        SA3[Storage Account\nUDR]
+        PG3[(Azure Database\nfor PostgreSQL\nUDR)]
     end
 
-    AFD --> APPGW
-    APPGW --> AS1 & AS2 & AS3
-    AS1 & AS2 & AS3 --> PG & REDIS & BLOB
-    ACI --> PG
-    AS1 & AS2 & AS3 --> MON
-    SEC -.->|secures| AS1 & APPGW & PG
-    DR -.->|backs up| PG & BLOB
+    subgraph RG4["rg-dls-coe-we-001  Shared Services"]
+        VNET4[Virtual Network]
+        PG4[(Azure Database\nfor PostgreSQL\nShared / CoE)]
+        UDR4[UDR Route Table]
+        MON[Azure Monitor]
+        AI[Application Insights]
+    end
 
-    style EDGE fill:#e8eaf6,stroke:#3949ab
-    style NETWORK fill:#e0f7fa,stroke:#00695c
-    style APP_TIER fill:#e8f5e9,stroke:#2e7d32
-    style DATA_TIER fill:#fff3e0,stroke:#e65100
-    style PLATFORM fill:#fce4ec,stroke:#880e4f
+    HUB -->|VNet Peering / UDR| RG1
+    HUB -->|VNet Peering / UDR| RG2
+    HUB -->|VNet Peering / UDR| RG3
+    HUB -->|VNet Peering / UDR| RG4
+
+    AKS1 --> ACR1
+    AKS1 --> SA1
+    AKS1 --> PG1
+    ACI1 --> PG1
+
+    AKS2 --> ACR2
+    AKS2 --> SA2
+    AKS2 --> PG2
+
+    AKS3 --> ACR3
+    AKS3 --> SA3
+    AKS3 --> PG3
+    ACI3 --> PG3
+
+    AKS1 -.->|metrics / logs| MON
+    AKS2 -.->|metrics / logs| MON
+    AKS3 -.->|metrics / logs| MON
+    MON --> AI
+
+    style RG1 fill:#e8f4fd,stroke:#0078D4
+    style RG2 fill:#e8f5e9,stroke:#107C41
+    style RG3 fill:#fff3e0,stroke:#c67b00
+    style RG4 fill:#fce4ec,stroke:#880e4f
 ```
 
 ---
@@ -59,56 +83,54 @@ graph TB
 
 | Category | Services | Monthly Cost | Share |
 |----------|---------|-------------|-------|
-| Compute | App Service 3x P1V2 + Container Instances | $17,000 | 37% |
-| Data | PostgreSQL + Storage Accounts + Redis | $16,000 | 35% |
-| Networking | VPN Gateway + Load Balancer | $3,000 | 7% |
-| Monitoring | Azure Monitor + Log Analytics + App Insights | $4,500 | 10% |
-| Security | Security Center + Key Vault | $1,500 | 3% |
+| Compute | AKS clusters (3× workload VNets) + Container Instances | $17,000 | 37% |
+| Data | PostgreSQL (4 instances) + Storage Accounts | $16,000 | 35% |
+| Networking | VNet Peering + UDR + Load Balancers | $3,000 | 7% |
+| Monitoring | Azure Monitor + App Insights + Log Analytics | $4,500 | 10% |
+| Security | Container Registry + Key Vault + Security Center | $1,500 | 3% |
 | Backup and DR | Backup Vault + Site Recovery | $4,000 | 9% |
 | **Total** | | **$46,000/mo** | **100%** |
 
 ```mermaid
 pie title Azure Monthly Cost $46,000
-    "Compute $17k" : 37
-    "Data $16k" : 35
+    "Compute AKS $17k" : 37
+    "Data PG/Storage $16k" : 35
     "Monitoring $4.5k" : 10
     "Backup/DR $4k" : 9
     "Networking $3k" : 7
-    "Security $1.5k" : 3
+    "Security/ACR $1.5k" : 3
 ```
 
 ---
 
-## Azure Network Topology
+## Azure Network Topology — Hub and Spoke
 
 ```mermaid
 graph TB
-    USERS[Global Users] --> AFD
-    CORP[Corporate Users] -->|IPSec IKEv2| VPN_GW
+    HUB[Sub-AFRPS-AF-INT\nHub Subscription\nCentralised Connectivity]
 
-    AFD[Azure Front Door\nGlobal Anycast IP] --> APPGW
-
-    subgraph VNET["Virtual Network  10.0.0.0/16"]
-        APPGW[Application Gateway\nWAF_v2 / 10.0.1.0/24]
-        APP[App Service Plan\n3x P1V2 / 10.0.2.0/24]
-        DB[(PostgreSQL\n10.0.3.10)]
-        RD[Redis\n10.0.3.20]
-        VPN_GW[VPN Gateway\n10.0.4.5]
+    subgraph WE["West Europe Region"]
+        V1[rg-ae-prod-we-001\nAKS + ACR + Storage + PostgreSQL]
+        V2[rg-cv-prod-we-001\nAKS + ACR + Storage + PostgreSQL]
+        V3[rg-as-las-we-001\nAKS + ACR + Storage + PostgreSQL]
+        V4[rg-dls-coe-we-001\nPostgreSQL + Monitor + App Insights]
     end
 
-    subgraph SERVICES["Azure Platform Services"]
-        KV[Key Vault]
-        MON[Azure Monitor]
-        BK[Azure Backup]
-    end
+    HUB -->|UDR + VNet Peering| V1
+    HUB -->|UDR + VNet Peering| V2
+    HUB -->|UDR + VNet Peering| V3
+    HUB -->|UDR + VNet Peering| V4
 
-    APPGW --> APP
-    APP --> DB & RD
-    APP --> MON & KV
-    DB --> BK
+    V1 -.->|telemetry| V4
+    V2 -.->|telemetry| V4
+    V3 -.->|telemetry| V4
 
-    style VNET fill:#e8f4fd,stroke:#0078D4
-    style SERVICES fill:#cce5ff,stroke:#0078D4
+    style HUB fill:#0078D4,color:#fff
+    style WE fill:#e8f4fd,stroke:#0078D4
+    style V1 fill:#dceefb,stroke:#0078D4
+    style V2 fill:#dceefb,stroke:#0078D4
+    style V3 fill:#dceefb,stroke:#0078D4
+    style V4 fill:#fce4ec,stroke:#880e4f
 ```
 
 ---
@@ -126,9 +148,8 @@ graph TB
 | Concurrent Users | 3,000 avg | 10,000 peak |
 | Page Load Time | 2.5 sec | < 3 sec |
 | DB Connections (avg) | 200 | < 400 |
-| Redis Hit Rate | 87% | > 85% |
 | Storage Used | 2.5 TB | — |
-| Database Size | 500 GB | — |
+| Database Instances | 4 (one per workload VNet) | — |
 | Monthly Cost | $46,000 | — |
 
 ---
@@ -151,8 +172,6 @@ graph LR
     style L3 fill:#fde8e8
     style L4 fill:#fde8e8
     style L5 fill:#fde8e8
-```
-
 ```
 
 ---

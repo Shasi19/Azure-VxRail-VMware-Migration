@@ -25,33 +25,26 @@ This document outlines the comprehensive migration strategy from Microsoft Azure
 
 **Azure Components in Use**:
 ```
-Compute Layer:
-├─ Azure App Service (3x instances, P1V2 plan)
-├─ Azure Container Instances
-└─ Auto-scaling enabled
+Compute Layer (3 Workload VNets):
+├─ Azure Kubernetes Service (AKS) — one cluster per workload VNet
+├─ Azure Container Instances — batch/ETL in rg-ae and rg-as-las VNets
+└─ Azure Container Registry (ACR) — one per workload VNet
 
-Data Layer:
-├─ Azure Database for PostgreSQL (Managed)
-├─ Azure Storage Accounts
-└─ Azure Cosmos DB (optional)
+Data Layer (4 VNets):
+├─ Azure Database for PostgreSQL (Managed) — one per VNet
+└─ Storage Accounts — one per workload VNet (blob, file, queue)
 
-Network Layer:
-├─ Azure Virtual Network (VNet)
-├─ Azure Application Gateway
-├─ Azure Load Balancer
-└─ Azure Front Door
+Network Layer (Hub-and-Spoke):
+├─ Hub Subscription: Sub-AFRPS-AF-INT
+├─ 4 Spoke VNets in West Europe
+└─ UDR (User Defined Routes) on all subnets → hub
 
-Monitoring & Security:
+Monitoring and Observability (rg-dls-coe-we-001):
 ├─ Azure Monitor
-├─ Application Insights
-├─ Azure Security Center
-├─ Azure Key Vault
-└─ Azure Sentinel
+└─ Application Insights
 
-Backup & DR:
-├─ Azure Backup
-├─ Azure Site Recovery
-└─ Geo-redundant storage
+Backup:
+└─ Azure Backup
 ```
 
 **Current Performance Metrics**:
@@ -241,16 +234,16 @@ Storage I/O               2,000 IOPS     5,000 IOPS   +35%/year
 
 | Azure Service | Current Usage | Purpose |
 |---|---|---|
-| App Service | 3x P1V2 instances | Web application hosting |
-| Container Instances | Ad-hoc | Batch jobs, scheduled tasks |
-| PostgreSQL Database | Managed | Production database |
-| Storage Accounts | 2.5TB | File storage, backups |
-| Application Gateway | Yes | Load balancing, SSL termination |
-| Virtual Network | Yes | Network isolation |
-| Azure Monitor | Yes | Metrics and monitoring |
-| Application Insights | Yes | APM and diagnostics |
-| Key Vault | Yes | Secrets management |
-| Backup | Yes | Data protection |
+| Azure Kubernetes Service (AKS) | 3 clusters (one per workload VNet) | Containerised application hosting |
+| Azure Container Instances | rg-ae, rg-as-las VNets | Batch jobs, scheduled ETL tasks |
+| Azure Container Registry (ACR) | 3 instances (one per workload VNet) | Private container image registry |
+| PostgreSQL Database | 4 instances (one per VNet incl. CoE) | Production databases per workload |
+| Storage Accounts | 3 workload VNets | File storage, blob, backups |
+| Virtual Network (Hub-Spoke) | 4 VNets + Sub-AFRPS-AF-INT hub | Network isolation + UDR routing |
+| Azure Monitor | rg-dls-coe-we-001 (centralised) | Metrics and monitoring |
+| Application Insights | rg-dls-coe-we-001 | APM and diagnostics |
+| UDR (User Defined Routes) | All workload VNets | Force-tunnel to hub subscription |
+| Azure Backup | Yes | Data protection |
 
 ---
 
