@@ -48,8 +48,8 @@ graph LR
         B6["📍 Data in Microsoft DC"]
     end
 
-    subgraph ARROW[""]
-        ARR["26-Week\nMigration\n▶▶▶"]
+    subgraph ARROW["Migration"]
+        ARR["26-Week\nMigration"]
     end
 
     subgraph AFTER["AFTER  -  On-Premises"]

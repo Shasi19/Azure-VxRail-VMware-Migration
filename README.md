@@ -53,8 +53,9 @@
 | [01 Executive Summary](docs/Volume-1-Executive-Architecture/01-Executive-Summary.md) | Business case, ROI, project overview |
 | [02 Existing Azure Architecture](docs/Volume-1-Executive-Architecture/02-Existing-Azure-Architecture.md) | Current state: components, costs, limitations |
 | [03 Target On-Premises Architecture](docs/Volume-1-Executive-Architecture/03-Target-Architecture.md) | Target state: K8s, PostgreSQL HA, F5, Palo Alto |
-| [04 Azure Architecture Visual](docs/Volume-1-Executive-Architecture/04-Azure-Architecture-Visual.md) | 🆕 Full Mermaid diagram of current Azure stack + cost breakdown |
-| [05 On-Prem Architecture Visual](docs/Volume-1-Executive-Architecture/05-OnPrem-Architecture-Visual.md) | 🆕 Full Mermaid diagram of target on-prem stack + VLAN map |
+| [04 Azure Architecture Visual](docs/Volume-1-Executive-Architecture/04-Azure-Architecture-Visual.md) | Full Mermaid diagram of current Azure stack (4-VNet hub-spoke) |
+| [05 On-Prem Architecture Visual](docs/Volume-1-Executive-Architecture/05-OnPrem-Architecture-Visual.md) | Full Mermaid diagram of target on-prem stack + VLAN map |
+| [06 Component Purpose Guide](docs/Volume-1-Executive-Architecture/06-Component-Purpose-Guide.md) | NEW — What every tool does, why chosen, Azure equivalent |
 
 ### Volume 2: Migration Strategy
 | Doc | Description |
@@ -62,6 +63,7 @@
 | [01 Migration Overview & Service Mapping](docs/Volume-2-Migration-Strategy/01-Migration-Overview.md) | Azure→OnPrem service map, flowcharts, risk register |
 | [02 Phase Implementation Guide](docs/Volume-2-Migration-Strategy/02-Phase-Implementation-Guide.md) | Gantt chart, step-by-step per phase, cutover sequence |
 | [03 Timeline & Milestones](docs/Volume-2-Migration-Strategy/03-Timeline-And-Milestones.md) | 26-week timeline, RACI, Go/No-Go gates, budget burn-down |
+| [04 Multi-Environment Migration Plan](docs/Volume-2-Migration-Strategy/04-Multi-Environment-Migration-Plan.md) | NEW — Dev, QA, Pre-Prod, Prod timelines with go/no-go gates |
 
 ### Volume 3: Infrastructure Setup
 | Doc | Description |

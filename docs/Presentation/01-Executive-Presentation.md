@@ -74,31 +74,50 @@ graph TB
 
 ---
 
-## Slide 3: Migration Timeline
+## Slide 3: Migration Timeline — 4 Environments, 34 Weeks
 
 ```mermaid
 gantt
-    title 26-Week Migration Roadmap
-    dateFormat  YYYY-MM-DD
-    axisFormat  Week %W
+    title Multi-Environment Migration - 34 Weeks
+    dateFormat YYYY-MM-DD
+    axisFormat Week %W
 
-    section 🏗️ Foundation
-    Procurement & Planning      :done, w1, 2024-01-01, 28d
-    Infrastructure Setup        :done, w2, 2024-01-29, 28d
+    section Infra Base
+    Hardware and Network Setup  :done,   p0a, 2024-01-01, 21d
+    K8s Cluster and Services    :done,   p0b, 2024-02-05, 21d
 
-    section ⚙️ Platform Build
-    Middleware (F5, Vault, MinIO):active, w3, 2024-02-26, 28d
-    Kubernetes Platform Build   :active, w4, 2024-03-25, 28d
+    section Dev Env
+    Deploy and Test Dev         :        p1a, 2024-02-26, 14d
+    Dev DB Migration            :        p1b, 2024-03-11, 7d
+    Dev Cutover                 :crit,   p1c, 2024-03-18, 7d
 
-    section 🧪 Validation
-    Testing & DR Drills         :w5, 2024-04-22, 28d
+    section QA Env
+    Deploy and Test QA          :        p2a, 2024-03-25, 14d
+    QA Regression Suite         :        p2b, 2024-04-08, 14d
+    QA Cutover                  :crit,   p2c, 2024-04-22, 7d
 
-    section 🚀 Go-Live
-    Cutover & Stabilization     :crit, w6, 2024-05-20, 35d
+    section Pre-Prod Env
+    Deploy PreProd              :        p3a, 2024-04-29, 14d
+    Load and Perf Test 150pct   :        p3b, 2024-05-20, 14d
+    Pen Test and DR Drill       :        p3c, 2024-06-03, 14d
+    PreProd Cutover             :crit,   p3d, 2024-06-17, 7d
 
-    section ✅ Complete
-    Azure Decommission          :w7, 2024-06-24, 28d
+    section Production
+    Live Replication Setup      :        p4a, 2024-06-24, 7d
+    Prod Cutover Weekend        :crit,   p4b, 2024-07-01, 3d
+    Stabilization               :        p4c, 2024-07-04, 21d
+
+    section Azure Cleanup
+    Delete Dev and QA RGs       :        p5a, 2024-07-25, 7d
+    Delete PreProd and Prod RGs :crit,   p5b, 2024-08-08, 21d
 ```
+
+| Environment | Weeks | Key Risk | Rollback Time |
+|-------------|-------|---------|---------------|
+| Dev | 5–8 | Low — isolated, no real users | < 5 min (DNS flip) |
+| QA | 9–13 | Low — test data only | < 5 min (DNS flip) |
+| Pre-Prod | 14–21 | Medium — prod-equivalent load test | < 5 min (DNS flip) |
+| Production | 22–30 | High — zero downtime required | < 60 sec (TTL=60 DNS) |
 
 ---
 
