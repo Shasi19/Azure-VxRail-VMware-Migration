@@ -39,7 +39,7 @@
 
 ```mermaid
 graph LR
-    subgraph BEFORE["☁️ BEFORE — Azure"]
+    subgraph BEFORE["BEFORE  -  Azure"]
         B1["💰 $552,000/year"]
         B2["📊 99.95% availability"]
         B3["⚡ 5,000 req/sec"]
@@ -52,7 +52,7 @@ graph LR
         ARR["26-Week\nMigration\n▶▶▶"]
     end
 
-    subgraph AFTER["🏢 AFTER — On-Premises"]
+    subgraph AFTER["AFTER  -  On-Premises"]
         A1["💰 $150,000/year\n💚 -73% cost"]
         A2["📊 99.99% availability\n💚 4× more reliable"]
         A3["⚡ 10,000 req/sec\n💚 2× throughput"]

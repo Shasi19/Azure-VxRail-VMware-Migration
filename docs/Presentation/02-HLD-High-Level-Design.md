@@ -27,11 +27,11 @@
 
 ```mermaid
 graph TB
-    subgraph CURRENT["☁️ CURRENT STATE — Azure"]
+    subgraph CURRENT["CURRENT STATE  -  Azure"]
         direction TB
         C_EDGE["Azure Front Door + WAF\nGlobal CDN + DDoS"]
         C_LB["Application Gateway WAF_v2\nSSL + Path Routing"]
-        C_APP["App Service 3× P1V2\n.NET | Windows | 2vCPU 3.5GB"]
+        C_APP["App Service 3x P1V2\n.NET | Windows | 2vCPU 3.5GB"]
         C_DB["PostgreSQL Managed PG11\n4vCore | 1TB | Zone HA"]
         C_CACHE["Redis Cache Premium\n6GB Cluster"]
         C_STORE["Azure Storage\n2.5TB RA-GRS"]
@@ -40,13 +40,13 @@ graph TB
         C_DR["Azure Backup\n+ Site Recovery"]
 
         C_EDGE --> C_LB --> C_APP
-        C_APP --> C_DB and C_CACHE and C_STORE
+        C_APP --> C_DB & C_CACHE & C_STORE
         C_APP --> C_MON
-        C_SEC -.->|secures| C_APP and C_DB
-        C_DR -.->|protects| C_DB and C_STORE
+        C_SEC -.->|secures| C_APP & C_DB
+        C_DR -.->|protects| C_DB & C_STORE
     end
 
-    subgraph TARGET["🏢 TARGET STATE — On-Premises"]
+    subgraph TARGET["TARGET STATE  -  On-Premises"]
         direction TB
         T_FW["Palo Alto PA-5250\nNGFW HA | 6 Security Zones"]
         T_LB["F5 BIG-IP 5200\nActive/Passive | SSL Offload"]
@@ -59,10 +59,10 @@ graph TB
         T_DR["Bacula + Velero\nDaily + WAL Archive\nRTO < 5min | RPO < 1min"]
 
         T_FW --> T_LB --> T_K8S
-        T_K8S --> T_DB and T_CACHE and T_STORE
+        T_K8S --> T_DB & T_CACHE & T_STORE
         T_K8S --> T_MON
-        T_SEC -.->|secures| T_K8S and T_DB
-        T_DR -.->|protects| T_DB and T_STORE
+        T_SEC -.->|secures| T_K8S & T_DB
+        T_DR -.->|protects| T_DB & T_STORE
     end
 
     CURRENT -->|"26-Week\nMigration"| TARGET
@@ -116,42 +116,42 @@ sequenceDiagram
 
 ```mermaid
 graph TB
-    subgraph HA_DESIGN["🔄 High Availability Design — Every Tier"]
-        subgraph TIER1["Tier 1: Network/Security — HA"]
-            FW_A["Palo Alto FW-1\n🟢 Active"]
-            FW_B["Palo Alto FW-2\n🔵 Passive"]
+    subgraph HA_DESIGN["High Availability Design  -  Every Tier"]
+        subgraph TIER1["Tier 1: Network/Security  -  HA"]
+            FW_A["Palo Alto FW-1\nActive"]
+            FW_B["Palo Alto FW-2\nPassive"]
             FW_A <-->|"HA Sync\n< 1 sec failover"| FW_B
 
-            LB_A["F5 BIG-IP LB-1\n🟢 Active"]
-            LB_B["F5 BIG-IP LB-2\n🔵 Passive"]
+            LB_A["F5 BIG-IP LB-1\nActive"]
+            LB_B["F5 BIG-IP LB-2\nPassive"]
             LB_A <-->|"VRRP\n< 3 sec failover"| LB_B
 
-            SW_A["Cisco Core-SW-1\n🟢 VPC Primary"]
-            SW_B["Cisco Core-SW-2\n🔵 VPC Secondary"]
+            SW_A["Cisco Core-SW-1\nVPC Primary"]
+            SW_B["Cisco Core-SW-2\nVPC Secondary"]
             SW_A <-->|"vPC Peer Link\n< 1 sec failover"| SW_B
         end
 
-        subgraph TIER2["Tier 2: Compute — K8s HA"]
-            CP_A["K8s Master-1\n🟢 etcd Leader"]
-            CP_B["K8s Master-2\n🔵 etcd Follower"]
-            CP_C["K8s Master-3\n🔵 etcd Follower"]
-            CP_A <-->|"Raft Consensus\nAuto-elect on failure"| CP_B and CP_C
+        subgraph TIER2["Tier 2: Compute  -  K8s HA"]
+            CP_A["K8s Master-1\netcd Leader"]
+            CP_B["K8s Master-2\netcd Follower"]
+            CP_C["K8s Master-3\netcd Follower"]
+            CP_A <-->|"Raft Consensus\nAuto-elect on failure"| CP_B & CP_C
 
-            W_POOL["Worker Pool\n6 Nodes (W1–W6)\nPod anti-affinity\nspreads pods"]
+            W_POOL["Worker Pool\n6 Nodes (W1-W6)\nPod anti-affinity\nspreads pods"]
         end
 
-        subgraph TIER3["Tier 3: Database — Patroni HA"]
-            DB_P["PostgreSQL Primary\n🟢 Leader"]
-            DB_S1["PostgreSQL Standby-1\n🔵 Sync Replica"]
-            DB_S2["PostgreSQL Standby-2\n🔵 Async Replica"]
-            DB_P -->|"Streaming Replication\nLag < 100ms"| DB_S1 and DB_S2
+        subgraph TIER3["Tier 3: Database  -  Patroni HA"]
+            DB_P["PostgreSQL Primary\nLeader"]
+            DB_S1["PostgreSQL Standby-1\nSync Replica"]
+            DB_S2["PostgreSQL Standby-2\nAsync Replica"]
+            DB_P -->|"Streaming Replication\nLag < 100ms"| DB_S1 & DB_S2
             ETCD_C["etcd DCS\n3-node\nLeader election"]
-            ETCD_C -.->|"Patroni failover\n< 30 seconds"| DB_P and DB_S1 and DB_S2
+            ETCD_C -.->|"Patroni failover\n< 30 seconds"| DB_P & DB_S1 & DB_S2
         end
 
-        subgraph TIER4["Tier 4: Storage — HA"]
-            NAS_A["NetApp NAS-1\n🟢 Active Controller"]
-            NAS_B["NetApp NAS-2\n🔵 Passive Controller"]
+        subgraph TIER4["Tier 4: Storage  -  HA"]
+            NAS_A["NetApp NAS-1\nActive Controller"]
+            NAS_B["NetApp NAS-2\nPassive Controller"]
             NAS_A <-->|"HA Pair Sync\nNDO (no disruption)"| NAS_B
         end
     end
@@ -169,9 +169,9 @@ graph TB
 
 ```mermaid
 flowchart LR
-    DEV["👨‍💻 Developer\npushes code"] --> GL
+    DEV["Developer\npushes code"] --> GL
 
-    subgraph GITLAB_CI["🦊 GitLab CI Pipeline"]
+    subgraph GITLAB_CI["GitLab CI Pipeline"]
         GL["GitLab\nRepository"] --> BUILD["Build Stage\ndotnet build\ndocker build"]
         BUILD --> TEST["Test Stage\nunit tests\nintegration tests"]
         TEST --> SCAN["Security Stage\nTrivy image scan\nSAST scan"]
@@ -179,16 +179,16 @@ flowchart LR
         PUSH --> UPDATE["Update Stage\ngit commit image tag\nto GitOps repo"]
     end
 
-    subgraph GITOPS["🔄 ArgoCD GitOps"]
+    subgraph GITOPS["ArgoCD GitOps"]
         UPDATE --> GITOPS_REPO["GitOps Repository\nHelm values\nK8s manifests"]
         GITOPS_REPO --> ARGO["ArgoCD\nDetects change\nAutomatically syncs"]
     end
 
-    subgraph K8S_DEPLOY["☸️ Kubernetes Deployment"]
+    subgraph K8S_DEPLOY["Kubernetes Deployment"]
         ARGO --> STAGING["Deploy to\nStaging namespace"]
         STAGING --> SMOKE["Automated\nSmoke Tests"]
-        SMOKE -->|"✅ Pass"| PROD["Deploy to\nProduction namespace\nRolling update"]
-        SMOKE -->|"❌ Fail"| ROLLBACK["Auto Rollback\nto previous version"]
+        SMOKE -->|"Pass"| PROD["Deploy to\nProduction namespace\nRolling update"]
+        SMOKE -->|"Fail"| ROLLBACK["Auto Rollback\nto previous version"]
     end
 
     PROD --> MON["📊 Prometheus\nMonitor new version"]
@@ -205,11 +205,11 @@ flowchart LR
 
 ```mermaid
 graph TB
-    subgraph EXTERNAL["🌐 External (Untrusted)"]
+    subgraph EXTERNAL["External (Untrusted)"]
         INT[Internet Traffic]
     end
 
-    subgraph SEC_LAYERS["🛡️ Security Layers — Defense in Depth"]
+    subgraph SEC_LAYERS["Security Layers  -  Defense in Depth"]
         L1["Layer 1: DDoS\nISP-level filtering\n+ Palo Alto inline"]
         L2["Layer 2: NGFW\nPalo Alto PA-5250\nApp-ID | User-ID | IPS\nSSL Inspection | AV"]
         L3["Layer 3: WAF\nF5 ASM / NGINX ModSecurity\nOWASP Top 10 protection"]

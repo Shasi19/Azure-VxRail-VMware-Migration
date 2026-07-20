@@ -7,8 +7,8 @@
 
 ```mermaid
 graph TB
-    subgraph CLUSTER["☸️ Kubernetes Cluster — prod-cluster"]
-        subgraph CP["Control Plane (HA — 3 nodes)"]
+    subgraph CLUSTER["Kubernetes Cluster  -  prod-cluster"]
+        subgraph CP["Control Plane (HA  -  3 nodes)"]
             CP1["🎛️ master-1\n10.0.3.11\nAPI Server\nScheduler\nController Mgr\netcd member"]
             CP2["🎛️ master-2\n10.0.3.12\nAPI Server\nScheduler\nController Mgr\netcd member"]
             CP3["🎛️ master-3\n10.0.3.13\nAPI Server\nScheduler\nController Mgr\netcd member"]
@@ -32,8 +32,8 @@ graph TB
         end
 
         subgraph NAMESPACES["Namespaces"]
-            NS1["📁 production\n- webapp (3–5 pods)\n- cronjobs"]
-            NS2["📁 staging\n- webapp (1–2 pods)"]
+            NS1["📁 production\n- webapp (3-5 pods)\n- cronjobs"]
+            NS2["📁 staging\n- webapp (1-2 pods)"]
             NS3["📁 monitoring\n- Prometheus\n- Grafana\n- Alertmanager"]
             NS4["📁 logging\n- Elasticsearch\n- Logstash\n- Kibana\n- Filebeat"]
             NS5["📁 argocd\n- ArgoCD server"]

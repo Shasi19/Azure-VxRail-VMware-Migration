@@ -42,17 +42,17 @@ gantt
     dateFormat  YYYY-MM-DD
     axisFormat  W%W
 
-    section Q1 2024 — Foundation
+    section Q1 2024  -  Foundation
     Project Kickoff          :milestone, m1, 2024-01-01, 0d
     Procurement Complete     :milestone, m2, 2024-01-29, 0d
     Infrastructure Ready     :milestone, m3, 2024-02-26, 0d
 
-    section Q2 2024 — Platform
+    section Q2 2024  -  Platform
     Middleware Ready         :milestone, m4, 2024-03-25, 0d
     Kubernetes Ready         :milestone, m5, 2024-04-22, 0d
     UAT Sign-off             :milestone, m6, 2024-05-20, 0d
 
-    section Q2-Q3 2024 — Go-Live
+    section Q2-Q3 2024  -  Go-Live
     GO-LIVE                  :crit, milestone, m7, 2024-05-24, 0d
     Project Complete         :milestone, m8, 2024-06-24, 0d
 ```

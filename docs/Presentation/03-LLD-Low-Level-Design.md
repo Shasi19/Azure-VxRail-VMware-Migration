@@ -99,10 +99,10 @@
 ```mermaid
 graph LR
     subgraph K8S_NODES["Kubernetes Nodes (9× Dell R750)"]
-        subgraph MASTERS["Masters — 3 nodes"]
+        subgraph MASTERS["Masters  -  3 nodes"]
             M_SPEC["🎛️ Spec per master:\n- 2× Intel Xeon Gold 6338\n  (32-core, 2.0GHz)\n- 256 GB DDR4-3200 ECC\n- 2× 960GB NVMe SSD\n- 2× 25GbE NIC\n- 1× IPMI management\nOS: Ubuntu 22.04 LTS"]
         end
-        subgraph WORKERS["Workers — 6 nodes"]
+        subgraph WORKERS["Workers  -  6 nodes"]
             W_SPEC["💻 Spec per worker:\n- 2× Intel Xeon Gold 6338\n  (32-core, 2.0GHz)\n- 512 GB DDR4-3200 ECC\n- 2× 1.92TB NVMe SSD\n- 2× 25GbE NIC\n- 1× IPMI management\nOS: Ubuntu 22.04 LTS"]
         end
     end
@@ -262,23 +262,23 @@ nas.company.com.          A     10.0.6.10
 
 ```mermaid
 graph TD
-    subgraph BACKUP_SCHED["💿 Backup Schedule"]
-        subgraph CONTINUOUS["⏱️ Continuous"]
+    subgraph BACKUP_SCHED["Backup Schedule"]
+        subgraph CONTINUOUS["Continuous"]
             WAL["PostgreSQL WAL Archiving\nEvery 5 minutes\nDestination: /mnt/backup/wal\nRetention: 7 days"]
         end
-        subgraph HOURLY["🕐 Hourly"]
+        subgraph HOURLY["Hourly"]
             VELERO_HOURLY["Velero K8s Namespace\nProduction namespace\nPV snapshots\nRetention: 24 hours"]
         end
-        subgraph DAILY["📅 Daily"]
+        subgraph DAILY["Daily"]
             PG_DAILY["PostgreSQL Base Backup\npg_basebackup (02:00 AM)\nCompressed tar\nRetention: 30 days"]
             MINIO_DAILY["MinIO Data Sync\nrclone sync to DR site\n(02:30 AM)\nRetention: 30 days"]
             VELERO_DAILY["Velero Daily\nAll namespaces\n(03:00 AM)\nRetention: 30 days"]
         end
-        subgraph WEEKLY["📆 Weekly"]
+        subgraph WEEKLY["Weekly"]
             FULL_BACKUP["Bacula Full Backup\nAll systems\n(Sunday 00:00)\nRetention: 1 year"]
             CONFIG_BACKUP["Config Backup\nSwitch/FW configs\nHelm values\nRetention: 90 days"]
         end
-        subgraph MONTHLY["📅 Monthly"]
+        subgraph MONTHLY["Monthly"]
             DR_DRILL["DR Drill\nFull failover test\nRTO + RPO validation\nReport to CTO"]
         end
     end

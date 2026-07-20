@@ -72,7 +72,7 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    subgraph AZURE["☁️ AZURE (Current State)"]
+    subgraph AZURE["AZURE (Current State)"]
         A1[App Service\n3x P1V2]
         A2[PostgreSQL\nManaged]
         A3[Redis Cache]
@@ -83,7 +83,7 @@ flowchart LR
         A8[Azure Backup\n+ ASR]
     end
 
-    subgraph MIGRATION["🔄 MIGRATION LAYER"]
+    subgraph MIGRATION["MIGRATION LAYER"]
         M1[Containerize Apps\nDocker Build]
         M2[pg_dump / pglogical\nLive Replication]
         M3[Redis DUMP/RESTORE\nRDB Snapshot]
@@ -94,7 +94,7 @@ flowchart LR
         M8[Backup Validation\nData Integrity]
     end
 
-    subgraph ONPREM["🏢 ON-PREMISES (Target State)"]
+    subgraph ONPREM["ON-PREMISES (Target State)"]
         O1[Kubernetes\nPods + HPA]
         O2[PostgreSQL HA\nPatroni + etcd]
         O3[Redis Cluster\n3-node]
@@ -125,17 +125,17 @@ flowchart LR
 
 ```mermaid
 graph LR
-    subgraph S1["🏗️ Stage 1: Foundation (Weeks 1–8)"]
+    subgraph S1["Stage 1: Foundation (Weeks 1-8)"]
         T1A[Procurement\nand Planning] --> T1B[Hardware\nInstallation]
         T1B --> T1C[Network\nConfiguration]
         T1C --> T1D[Virtualization\nSetup]
     end
-    subgraph S2["⚙️ Stage 2: Platform (Weeks 9–16)"]
+    subgraph S2["Stage 2: Platform (Weeks 9-16)"]
         T2A[Kubernetes\nCluster] --> T2B[PostgreSQL\nHA Setup]
         T2B --> T2C[Redis and\nMinIO]
         T2C --> T2D[Monitoring\nStack]
     end
-    subgraph S3["🚀 Stage 3: Migration (Weeks 17–26)"]
+    subgraph S3["Stage 3: Migration (Weeks 17-26)"]
         T3A[App\nContainerization] --> T3B[Data\nMigration]
         T3B --> T3C[Testing &\nValidation]
         T3C --> T3D[Go-Live\nCutover]
@@ -155,17 +155,17 @@ graph LR
 
 ```mermaid
 graph TB
-    subgraph INTERNET["🌐 Internet"]
+    subgraph INTERNET["Internet"]
         USR[End Users]
         ISP[ISP / WAN Link\n1Gbps]
     end
 
-    subgraph DMZ["🔒 DMZ Zone"]
+    subgraph DMZ["DMZ Zone"]
         PA[Palo Alto NGFW\nHA Pair]
         F5[F5 BIG-IP\nActive/Passive]
     end
 
-    subgraph K8S["☸️ Kubernetes Cluster"]
+    subgraph K8S["Kubernetes Cluster"]
         subgraph CONTROL["Control Plane"]
             CP1[Master-1\n10.0.2.11]
             CP2[Master-2\n10.0.2.12]
@@ -182,20 +182,20 @@ graph TB
         ING[NGINX Ingress\nMetalLB VIP]
     end
 
-    subgraph DATA["💾 Data Layer"]
+    subgraph DATA["Data Layer"]
         PG1[(PostgreSQL\nPrimary\n10.0.5.1)]
         PG2[(PostgreSQL\nStandby\n10.0.5.2)]
         REDIS[Redis Cluster\n3-node]
         MINIO[MinIO\nObject Storage\n10TB]
     end
 
-    subgraph MON["📊 Monitoring"]
+    subgraph MON["Monitoring"]
         PROM[Prometheus]
         GRAF[Grafana]
         ELK[ELK Stack]
     end
 
-    subgraph MGMT["⚙️ Management"]
+    subgraph MGMT["Management"]
         VAULT[HashiCorp Vault]
         ARGO[ArgoCD]
         HARBOR[Harbor Registry]
@@ -254,22 +254,22 @@ graph TB
 
 ```mermaid
 graph TD
-    subgraph CRITICAL["🔴 CRITICAL — Mitigate Immediately"]
+    subgraph CRITICAL["CRITICAL  -  Mitigate Immediately"]
         R1["Hardware Delivery Delays\nProb: High | Impact: High\nMitigation: Order 8 weeks early"]
         R2["Data Loss During Migration\nProb: Medium | Impact: Critical\nMitigation: pglogical live replication + rollback"]
     end
-    subgraph HIGH["🟠 HIGH — Active Monitoring"]
+    subgraph HIGH["HIGH  -  Active Monitoring"]
         R3["Performance Degradation\nProb: Medium | Impact: High\nMitigation: Load test pre-cutover"]
         R4["DB Replication Lag\nProb: High | Impact: Medium\nMitigation: Monitor lag < 100ms"]
         R5["Team Skill Gaps\nProb: High | Impact: Medium\nMitigation: K8s + Patroni training"]
     end
-    subgraph MEDIUM["🟡 MEDIUM — Contingency Plan"]
+    subgraph MEDIUM["MEDIUM  -  Contingency Plan"]
         R6["Network Connectivity\nProb: Medium | Impact: Medium\nMitigation: Dual ISP links"]
         R7["License Compliance\nProb: Low | Impact: Medium\nMitigation: License audit upfront"]
         R8["Rollback Complexity\nProb: Low | Impact: High\nMitigation: Tested rollback runbook"]
         R9["Compliance Drift\nProb: Low | Impact: High\nMitigation: Compliance gate per phase"]
     end
-    subgraph LOW["🟢 LOW — Accept / Monitor"]
+    subgraph LOW["LOW  -  Accept / Monitor"]
         R10["Vendor Support Gaps\nProb: Low | Impact: Medium\nMitigation: Support contracts pre-go-live"]
     end
 

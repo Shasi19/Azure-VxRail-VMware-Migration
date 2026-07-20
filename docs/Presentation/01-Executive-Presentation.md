@@ -30,8 +30,8 @@
 
 ```mermaid
 graph TB
-    subgraph FINANCIAL["💰 5-Year Financial Analysis"]
-        subgraph AZURE_5["☁️ Azure — 5-Year Cost"]
+    subgraph FINANCIAL["5-Year Financial Analysis"]
+        subgraph AZURE_5["Azure  -  5-Year Cost"]
             AY1["Year 1: $552,000"]
             AY2["Year 2: $635,000 (+15%)"]
             AY3["Year 3: $730,000 (+15%)"]
@@ -39,15 +39,15 @@ graph TB
             AY5["Year 5: $966,000 (+15%)"]
             ATOTAL["💸 TOTAL: $3,723,000"]
         end
-        subgraph ONPREM_5["🏢 On-Premises — 5-Year Cost"]
+        subgraph ONPREM_5["On-Premises  -  5-Year Cost"]
             OP_CAPEX["Year 1 CapEx: $1,900,000\n(Hardware + Network + Storage)"]
             OP_Y1["Year 1 OpEx: $700,000\n(Staff + Maintenance + Licenses)"]
-            OP_Y2_5["Years 2–5: $700,000/yr\n(Ongoing operations)"]
+            OP_Y2_5["Years 2-5: $700,000/yr\n(Ongoing operations)"]
             OPTOTAL["💚 TOTAL: $4,500,000\n(incl. Year 1 CapEx)"]
         end
-        subgraph SAVINGS["📊 Break-Even and Savings"]
-            BE["Break-even: Month 18–24"]
-            SAV["Year 3–5 Savings: $1,200,000+"]
+        subgraph SAVINGS["Break-Even and Savings"]
+            BE["Break-even: Month 18-24"]
+            SAV["Year 3-5 Savings: $1,200,000+"]
             ROI["5-Year Net Saving: vs. Azure"]
         end
     end
@@ -130,7 +130,7 @@ gantt
 
 ```mermaid
 graph LR
-    subgraph RISKS["⚠️ Key Risks and Mitigations"]
+    subgraph RISKS["Key Risks and Mitigations"]
         R1["🔴 Data Loss\n──────────\nMitigation:\nLive pglogical replication\nRollback to Azure < 60s\nZero-downtime cutover"]
         R2["🟠 Performance Drop\n──────────\nMitigation:\nLoad test to 150% capacity\nbefore go-live\nAuto-scaling configured"]
         R3["🟠 Hardware Delays\n──────────\nMitigation:\nOrder 8 weeks ahead\nSecondary vendor identified\nCloud burst fallback"]

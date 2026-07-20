@@ -7,7 +7,7 @@
 
 ```mermaid
 gantt
-    title Azure to On-Premises Migration — 26-Week Project Plan
+    title Azure to On-Premises Migration  -  26-Week Project Plan
     dateFormat  YYYY-MM-DD
     axisFormat  Week %W
 
