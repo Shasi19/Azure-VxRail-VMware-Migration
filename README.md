@@ -1,6 +1,6 @@
 # Azure to On-Premises Migration
 
-> **Complete migration guide** for transitioning from Microsoft Azure cloud infrastructure to a high-availability on-premises Kubernetes deployment.
+> **Complete migration guide** — from current Azure architecture through every phase of on-premises deployment, including HLD/LLD diagrams, detailed commands, and go-live runbook.
 
 ---
 
@@ -37,44 +37,62 @@
 
 ## 📚 Documentation Structure
 
+### 🎨 [Presentation](docs/Presentation/) — Start Here for Overviews
+| Doc | Audience | Description |
+|-----|----------|-------------|
+| [00 Index](docs/Presentation/00-Index.md) | All | Navigation and quick stats |
+| [01 Executive Presentation](docs/Presentation/01-Executive-Presentation.md) | CTO, Board | Business case, ROI, timeline, risk summary |
+| [02 HLD — High Level Design](docs/Presentation/02-HLD-High-Level-Design.md) | Architects | Architecture, traffic flow, security, CI/CD design |
+| [03 LLD — Low Level Design](docs/Presentation/03-LLD-Low-Level-Design.md) | Engineers | IP plan, hardware specs, K8s resources, DNS, backup |
+
+---
+
 ### Volume 1: Executive & Solution Architecture
 | Doc | Description |
 |-----|-------------|
 | [01 Executive Summary](docs/Volume-1-Executive-Architecture/01-Executive-Summary.md) | Business case, ROI, project overview |
 | [02 Existing Azure Architecture](docs/Volume-1-Executive-Architecture/02-Existing-Azure-Architecture.md) | Current state: components, costs, limitations |
 | [03 Target On-Premises Architecture](docs/Volume-1-Executive-Architecture/03-Target-Architecture.md) | Target state: K8s, PostgreSQL HA, F5, Palo Alto |
+| [04 Azure Architecture Visual](docs/Volume-1-Executive-Architecture/04-Azure-Architecture-Visual.md) | 🆕 Full Mermaid diagram of current Azure stack + cost breakdown |
+| [05 On-Prem Architecture Visual](docs/Volume-1-Executive-Architecture/05-OnPrem-Architecture-Visual.md) | 🆕 Full Mermaid diagram of target on-prem stack + VLAN map |
 
-### Volume 2: Migration Strategy *(New)*
+### Volume 2: Migration Strategy
 | Doc | Description |
 |-----|-------------|
-| [01 Migration Overview & Service Mapping](docs/Volume-2-Migration-Strategy/01-Migration-Overview.md) | Azure→OnPrem service map, flowcharts, risk matrix |
+| [01 Migration Overview & Service Mapping](docs/Volume-2-Migration-Strategy/01-Migration-Overview.md) | Azure→OnPrem service map, flowcharts, risk register |
 | [02 Phase Implementation Guide](docs/Volume-2-Migration-Strategy/02-Phase-Implementation-Guide.md) | Gantt chart, step-by-step per phase, cutover sequence |
 | [03 Timeline & Milestones](docs/Volume-2-Migration-Strategy/03-Timeline-And-Milestones.md) | 26-week timeline, RACI, Go/No-Go gates, budget burn-down |
 
-### Volume 3: Infrastructure Setup *(New)*
+### Volume 3: Infrastructure Setup
 | Doc | Description |
 |-----|-------------|
-| [01 Network & Compute Configuration](docs/Volume-3-Infrastructure-Setup/01-Network-Compute-Configuration.md) | Rack layout, firewall rules, F5 config, VMware vSphere, NetApp |
+| [01 Network & Compute Configuration](docs/Volume-3-Infrastructure-Setup/01-Network-Compute-Configuration.md) | Rack layout, Palo Alto + F5 config, VMware vSphere, NetApp ONTAP |
 
-### Volume 5: Database Migration *(New)*
+### Volume 4: Kubernetes Platform 🆕
 | Doc | Description |
 |-----|-------------|
-| [01 PostgreSQL HA Migration](docs/Volume-5-Database-Migration/01-PostgreSQL-HA-Migration.md) | Patroni cluster, pglogical live replication, PgBouncer, HAProxy |
+| [01 Kubernetes Setup Guide](docs/Volume-4-Kubernetes-Platform/01-Kubernetes-Setup-Guide.md) | Step-by-step K8s install: preflight → control plane → workers → CNI → ArgoCD → Vault |
+| [02 Detailed Commands Reference](docs/Volume-4-Kubernetes-Platform/02-Detailed-Commands-Reference.md) | **Build, deploy, ops, DB, Redis, monitoring, Vault, troubleshooting, end-user commands** |
 
-### Volume 6: Application Migration *(New)*
+### Volume 5: Database Migration
+| Doc | Description |
+|-----|-------------|
+| [01 PostgreSQL HA Migration](docs/Volume-5-Database-Migration/01-PostgreSQL-HA-Migration.md) | Patroni cluster, pglogical live replication, PgBouncer, HAProxy, backup |
+
+### Volume 6: Application Migration
 | Doc | Description |
 |-----|-------------|
 | [01 App Containerization & Deployment](docs/Volume-6-Application-Migration/01-App-Containerization-And-Deployment.md) | Dockerfile, Helm chart, ArgoCD GitOps, GitLab CI/CD pipeline |
 
-### Volume 7: Monitoring & Security *(New)*
+### Volume 7: Monitoring & Security
 | Doc | Description |
 |-----|-------------|
-| [01 Monitoring & Alerting Setup](docs/Volume-7-Monitoring-Security/01-Monitoring-And-Alerting-Setup.md) | Prometheus, Grafana, ELK, Vault, Alertmanager rules |
+| [01 Monitoring & Alerting Setup](docs/Volume-7-Monitoring-Security/01-Monitoring-And-Alerting-Setup.md) | Prometheus, Grafana, ELK Stack, HashiCorp Vault, 15+ alert rules |
 
-### Volume 8: Go-Live & Operations *(New)*
+### Volume 8: Go-Live & Operations
 | Doc | Description |
 |-----|-------------|
-| [01 Go-Live Runbook & Operations](docs/Volume-8-GoLive-Operations/01-GoLive-Runbook-And-Operations.md) | Cutover runbook, rollback plan, daily ops checklist, SLAs, Azure decommission |
+| [01 Go-Live Runbook & Operations](docs/Volume-8-GoLive-Operations/01-GoLive-Runbook-And-Operations.md) | Cutover decision tree, rollback plan, daily ops checklist, SLAs, Azure decommission |
 
 ---
 

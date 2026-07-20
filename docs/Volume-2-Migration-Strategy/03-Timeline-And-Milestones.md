@@ -167,15 +167,34 @@ Legend:  █ = Hardware/CapEx   ░ = Network/Infra   ▒ = Middleware
 
 ---
 
-## KPI Dashboard
+## KPI Dashboard — Migration Progress by Phase
+
+| Phase | Description | Progress | Status |
+|-------|-------------|----------|--------|
+| Phase 1 | Procurement & Planning | `████████████` 100% | ✅ Done |
+| Phase 2 | Infrastructure Setup | `████████████` 100% | ✅ Done |
+| Phase 3 | Middleware Deployment | `████████████` 100% | ✅ Done |
+| Phase 4 | Kubernetes Platform | `██████████░░` 85% | 🔄 In Progress |
+| Phase 5 | Testing & Validation | `████░░░░░░░░` 30% | 🔄 In Progress |
+| Phase 6 | Go-Live & Cutover | `░░░░░░░░░░░░` 0% | ⏳ Pending |
+| Phase 7 | Stabilization | `░░░░░░░░░░░░` 0% | ⏳ Pending |
 
 ```mermaid
-xychart-beta
-    title "Migration Progress by Phase (% Complete)"
-    x-axis ["Ph1: Procurement", "Ph2: Infra", "Ph3: Middleware", "Ph4: K8s", "Ph5: Testing", "Ph6: Go-Live", "Ph7: Stabilize"]
-    y-axis "Completion %" 0 --> 100
-    bar [100, 100, 100, 85, 30, 0, 0]
-    line [100, 100, 100, 85, 30, 0, 0]
+graph LR
+    P1["Ph1: Procurement\n✅ 100%"] --> P2["Ph2: Infra Setup\n✅ 100%"]
+    P2 --> P3["Ph3: Middleware\n✅ 100%"]
+    P3 --> P4["Ph4: Kubernetes\n🔄 85%"]
+    P4 --> P5["Ph5: Testing\n🔄 30%"]
+    P5 --> P6["Ph6: Go-Live\n⏳ 0%"]
+    P6 --> P7["Ph7: Stabilize\n⏳ 0%"]
+
+    style P1 fill:#2e7d32,color:#fff
+    style P2 fill:#2e7d32,color:#fff
+    style P3 fill:#2e7d32,color:#fff
+    style P4 fill:#f57c00,color:#fff
+    style P5 fill:#f57c00,color:#fff
+    style P6 fill:#607d8b,color:#fff
+    style P7 fill:#607d8b,color:#fff
 ```
 
 ---

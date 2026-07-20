@@ -124,24 +124,29 @@ flowchart LR
 ## Migration Strategy: 3-Stage Approach
 
 ```mermaid
-journey
-    title Azure to On-Premises Migration Journey
-    section Stage 1: Foundation (Weeks 1-8)
-      Procurement & Planning: 5: Team
-      Hardware Installation: 4: Team
-      Network Configuration: 4: Team, Network
-      Virtualization Setup: 4: Team, Vendor
-    section Stage 2: Platform (Weeks 9-16)
-      Kubernetes Cluster: 3: Team, DevOps
-      PostgreSQL HA Setup: 3: Team, DBA
-      Redis & MinIO Deploy: 4: Team
-      Monitoring Stack: 4: Team, DevOps
-    section Stage 3: Migration (Weeks 17-26)
-      App Containerization: 3: Developers
-      Data Migration: 2: DBA, Team
-      Testing & Validation: 3: QA, Team
-      Go-Live Cutover: 4: All Teams
-      Stabilization: 5: Ops Team
+graph LR
+    subgraph S1["🏗️ Stage 1: Foundation (Weeks 1–8)"]
+        T1A[Procurement\n& Planning] --> T1B[Hardware\nInstallation]
+        T1B --> T1C[Network\nConfiguration]
+        T1C --> T1D[Virtualization\nSetup]
+    end
+    subgraph S2["⚙️ Stage 2: Platform (Weeks 9–16)"]
+        T2A[Kubernetes\nCluster] --> T2B[PostgreSQL\nHA Setup]
+        T2B --> T2C[Redis &\nMinIO]
+        T2C --> T2D[Monitoring\nStack]
+    end
+    subgraph S3["🚀 Stage 3: Migration (Weeks 17–26)"]
+        T3A[App\nContainerization] --> T3B[Data\nMigration]
+        T3B --> T3C[Testing &\nValidation]
+        T3C --> T3D[Go-Live\nCutover]
+        T3D --> T3E[Stabilization]
+    end
+
+    S1 --> S2 --> S3
+
+    style S1 fill:#e3f2fd,stroke:#1565c0
+    style S2 fill:#e8f5e9,stroke:#2e7d32
+    style S3 fill:#fff3e0,stroke:#e65100
 ```
 
 ---
@@ -248,24 +253,30 @@ graph TB
 ## Risk Register
 
 ```mermaid
-quadrantChart
-    title Migration Risk Matrix
-    x-axis Low Impact --> High Impact
-    y-axis Low Probability --> High Probability
-    quadrant-1 Monitor
-    quadrant-2 Mitigate Urgently
-    quadrant-3 Accept
-    quadrant-4 Contingency Plan
-    Hardware Delays: [0.85, 0.65]
-    Data Loss During Migration: [0.9, 0.35]
-    Performance Degradation: [0.75, 0.55]
-    Database Replication Lag: [0.6, 0.6]
-    Team Skill Gaps: [0.45, 0.70]
-    Network Connectivity: [0.55, 0.40]
-    License Issues: [0.35, 0.45]
-    Rollback Complexity: [0.65, 0.30]
-    Vendor Support Gaps: [0.40, 0.35]
-    Compliance Drift: [0.80, 0.25]
+graph TD
+    subgraph CRITICAL["🔴 CRITICAL — Mitigate Immediately"]
+        R1["Hardware Delivery Delays\nProb: High | Impact: High\nMitigation: Order 8 weeks early"]
+        R2["Data Loss During Migration\nProb: Medium | Impact: Critical\nMitigation: pglogical live replication + rollback"]
+    end
+    subgraph HIGH["🟠 HIGH — Active Monitoring"]
+        R3["Performance Degradation\nProb: Medium | Impact: High\nMitigation: Load test pre-cutover"]
+        R4["DB Replication Lag\nProb: High | Impact: Medium\nMitigation: Monitor lag < 100ms"]
+        R5["Team Skill Gaps\nProb: High | Impact: Medium\nMitigation: K8s + Patroni training"]
+    end
+    subgraph MEDIUM["🟡 MEDIUM — Contingency Plan"]
+        R6["Network Connectivity\nProb: Medium | Impact: Medium\nMitigation: Dual ISP links"]
+        R7["License Compliance\nProb: Low | Impact: Medium\nMitigation: License audit upfront"]
+        R8["Rollback Complexity\nProb: Low | Impact: High\nMitigation: Tested rollback runbook"]
+        R9["Compliance Drift\nProb: Low | Impact: High\nMitigation: Compliance gate per phase"]
+    end
+    subgraph LOW["🟢 LOW — Accept / Monitor"]
+        R10["Vendor Support Gaps\nProb: Low | Impact: Medium\nMitigation: Support contracts pre-go-live"]
+    end
+
+    style CRITICAL fill:#fde8e8,stroke:#c62828
+    style HIGH fill:#fff3e0,stroke:#e65100
+    style MEDIUM fill:#fffde7,stroke:#f9a825
+    style LOW fill:#e8f5e9,stroke:#2e7d32
 ```
 
 ---
@@ -319,7 +330,7 @@ graph TD
 | Vol 2 Ch 2 | [Phase Implementation Guide](./02-Phase-Implementation-Guide.md) | ✅ Complete |
 | Vol 2 Ch 3 | [Timeline & Milestones](./03-Timeline-And-Milestones.md) | ✅ Complete |
 | Vol 3 | [Infrastructure Setup](../Volume-3-Infrastructure-Setup/) | ✅ Complete |
-| Vol 4 | [Kubernetes Platform](../Volume-4-Kubernetes-Platform/) | ✅ Complete |
+| Vol 4 | [Kubernetes Platform](../Volume-4-Kubernetes-Platform/01-Kubernetes-Setup-Guide.md) | ✅ Complete |
 | Vol 5 | [Database Migration](../Volume-5-Database-Migration/) | ✅ Complete |
 | Vol 6 | [Application Migration](../Volume-6-Application-Migration/) | ✅ Complete |
 | Vol 7 | [Monitoring & Security](../Volume-7-Monitoring-Security/) | ✅ Complete |
