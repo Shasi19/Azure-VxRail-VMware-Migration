@@ -99,6 +99,45 @@
 
 ---
 
+## Deployment Guides
+
+Two complete deployment paths for setting up the on-premises environment:
+
+### OnPrem-KVM (Kubernetes inside KVM Virtual Machines)
+> Best for: VM-level isolation, snapshot-based DR, lab/multi-tenant environments.  
+> KVM hypervisor runs on bare-metal hosts; K8s runs inside guest VMs.
+
+| # | Doc | Contents |
+|---|-----|----------|
+| 00 | [Index](docs/OnPrem-KVM/00-Index.md) | Architecture overview, hardware requirements, IP plan |
+| 01 | [KVM Host Setup](docs/OnPrem-KVM/01-KVM-Host-Setup.md) | Install KVM, libvirt, bridge networking, storage pool |
+| 02 | [VM Provisioning](docs/OnPrem-KVM/02-VM-Provisioning.md) | Cloud-init VM creation for all 12 VMs, snapshots |
+| 03 | [Network Configuration](docs/OnPrem-KVM/03-Network-Configuration.md) | VM networking, MetalLB, firewall, NTP |
+| 04 | [Kubernetes Setup](docs/OnPrem-KVM/04-Kubernetes-Setup.md) | kubeadm HA cluster, Calico CNI, namespaces, Ingress |
+| 05 | [Storage Setup](docs/OnPrem-KVM/05-Storage-Setup.md) | MinIO distributed, NetApp NFS StorageClass |
+| 06 | [Database Setup](docs/OnPrem-KVM/06-Database-Setup.md) | PostgreSQL+Patroni HA, MongoDB ReplicaSet, PgBouncer |
+| 07 | [Platform Services](docs/OnPrem-KVM/07-Platform-Services.md) | Harbor, ArgoCD, GitLab CI, Vault, Redis |
+| 08 | [Observability and Security](docs/OnPrem-KVM/08-Observability-Security.md) | Prometheus, Grafana, ELK, Jaeger, NetworkPolicy |
+| 09 | [Backup and DR](docs/OnPrem-KVM/09-Backup-DR.md) | Velero, Bacula, KVM VM snapshots, etcd backup |
+
+### OnPrem-BareMetal (Kubernetes directly on physical servers)
+> Best for: Maximum performance, simpler architecture, dedicated hardware.  
+> No hypervisor — K8s runs directly on physical server OS.
+
+| # | Doc | Contents |
+|---|-----|----------|
+| 00 | [Index](docs/OnPrem-BareMetal/00-Index.md) | Architecture overview, hardware requirements, KVM vs BareMetal comparison |
+| 01 | [Server Preparation](docs/OnPrem-BareMetal/01-Server-Preparation.md) | OS install, BIOS tuning, kernel modules, containerd |
+| 02 | [Network Configuration](docs/OnPrem-BareMetal/02-Network-Configuration.md) | NIC bonding, VLANs, static IPs, firewall, MetalLB |
+| 03 | [Kubernetes Setup](docs/OnPrem-BareMetal/03-Kubernetes-Setup.md) | kubeadm with keepalived VIP, Calico CNI, node labels |
+| 04 | [Storage Setup](docs/OnPrem-BareMetal/04-Storage-Setup.md) | MinIO on NVMe, NetApp NFS StorageClass, performance tuning |
+| 05 | [Database Setup](docs/OnPrem-BareMetal/05-Database-Setup.md) | PostgreSQL+Patroni, MongoDB ReplicaSet, K8s secrets |
+| 06 | [Platform Services](docs/OnPrem-BareMetal/06-Platform-Services.md) | Harbor, ArgoCD, GitLab CI, Vault, Redis |
+| 07 | [Observability and Security](docs/OnPrem-BareMetal/07-Observability-Security.md) | Prometheus, Grafana, ELK, Jaeger, NetworkPolicy |
+| 08 | [Backup and DR](docs/OnPrem-BareMetal/08-Backup-DR.md) | Velero, Bacula, etcd backup, node recovery runbook |
+
+---
+
 ## 🗓️ High-Level Timeline
 
 ```
