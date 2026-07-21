@@ -238,7 +238,7 @@ Datastore Configuration:
 
 ```
 Cluster Overview:
-├─ K8s Version: 1.28.x
+├─ K8s Version: 1.29.x
 ├─ Deployment: Kubeadm (HA)
 ├─ Control Plane: 3 nodes (stacked etcd)
 ├─ Worker Nodes: 6 nodes
@@ -311,7 +311,7 @@ Namespaces (Logical Isolation):
 ├─ kube-node-lease
 ├─ kube-public
 ├─ production
-├─ staging
+├─ preprod
 ├─ development
 ├─ monitoring
 └─ ingress-nginx
@@ -322,7 +322,7 @@ Resource Quotas & Limits:
 │  ├─ Memory Limit: 128 GB
 │  ├─ Storage Limit: 500 GB
 │  └─ Pod Count Limit: 200
-├─ Staging Namespace:
+├─ PreProd Namespace:
 │  ├─ CPU Limit: 20 cores
 │  ├─ Memory Limit: 64 GB
 │  ├─ Storage Limit: 250 GB

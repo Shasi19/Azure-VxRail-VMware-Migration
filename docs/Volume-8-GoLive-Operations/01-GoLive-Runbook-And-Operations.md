@@ -83,7 +83,7 @@ flowchart TD
 ║  Rollback Readiness                                                       ║
 ║  [ ] Azure App Service: still running (don't stop yet)                   ║
 ║  [ ] Rollback runbook reviewed by team                                    ║
-║  [ ] Rollback tested in staging successfully                              ║
+║  [ ] Rollback tested in preprod successfully                              ║
 ║  [ ] Decision criteria documented: "rollback if X within Y minutes"     ║
 ╠══════════════════════════════════════════════════════════════════════════╣
 ║  Team Readiness                                                           ║

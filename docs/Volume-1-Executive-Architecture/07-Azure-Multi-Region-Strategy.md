@@ -556,7 +556,7 @@ Security Patching (Monthly):
 ├─ OS patches: Automatic (unattended-upgrades)
 ├─ Container runtime: Patched weekly
 ├─ Dependencies: Updated via Dependabot
-└─ Testing: Staging environment first
+└─ Testing: PreProd environment first
 ```
 
 ---

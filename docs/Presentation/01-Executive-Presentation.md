@@ -150,10 +150,10 @@ gantt
 ```mermaid
 graph LR
     subgraph RISKS["Key Risks and Mitigations"]
-        R1["🔴 Data Loss\n──────────\nMitigation:\nLive pglogical replication\nRollback to Azure < 60s\nZero-downtime cutover"]
-        R2["🟠 Performance Drop\n──────────\nMitigation:\nLoad test to 150% capacity\nbefore go-live\nAuto-scaling configured"]
-        R3["🟠 Hardware Delays\n──────────\nMitigation:\nOrder 8 weeks ahead\nSecondary vendor identified\nCloud burst fallback"]
-        R4["🟡 Team Skill Gaps\n──────────\nMitigation:\nK8s + Patroni training\n4 weeks before deploy\nVendor support contract"]
+        R1["🔴 Data Loss\n--- Mitigation ---\nLive pglogical replication\nRollback to Azure under 60s\nZero-downtime cutover"]
+        R2["🟠 Performance Drop\n--- Mitigation ---\nLoad test to 150% capacity\nbefore go-live\nAuto-scaling configured"]
+        R3["🟠 Hardware Delays\n--- Mitigation ---\nOrder 8 weeks ahead\nSecondary vendor identified\nCloud burst fallback"]
+        R4["🟡 Team Skill Gaps\n--- Mitigation ---\nK8s + Patroni training\n4 weeks before deploy\nVendor support contract"]
     end
 
     style R1 fill:#fde8e8,stroke:#c62828

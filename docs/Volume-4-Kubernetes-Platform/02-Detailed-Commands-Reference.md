@@ -40,11 +40,11 @@ echo "✅ Image pushed: ${HARBOR}/${PROJECT}/${APP}:${TAG}"
 ### Deploy via Helm
 
 ```bash
-# ── Deploy to STAGING ─────────────────────────────────────────────────────
-helm upgrade --install webapp-staging ./helm/webapp-chart \
-  --namespace staging --create-namespace \
+# ── Deploy to PREPROD ─────────────────────────────────────────────────────
+helm upgrade --install webapp-preprod ./helm/webapp-chart \
+  --namespace preprod --create-namespace \
   --set image.tag=${TAG} \
-  --values ./helm/values-staging.yaml \
+  --values ./helm/values-preprod.yaml \
   --wait --timeout 5m \
   --atomic          # Rollback automatically on failure
 

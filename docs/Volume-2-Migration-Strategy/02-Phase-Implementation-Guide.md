@@ -272,7 +272,7 @@ WEEK 10: Container Registry & Object Storage
   ├─ Harbor Registry
   │   ├─ [ ] Deploy Harbor on VM or K8s
   │   ├─ [ ] Configure LDAP authentication
-  │   ├─ [ ] Set up project: production, staging
+  │   ├─ [ ] Set up project: production, preprod
   │   ├─ [ ] Configure vulnerability scanning (Trivy)
   │   └─ [ ] Pull and push Azure images to Harbor
   │
@@ -354,9 +354,9 @@ sudo systemctl restart containerd
 
 # ── STEP 3: Install kubeadm, kubelet, kubectl ─────────────────────────────
 sudo apt install -y apt-transport-https ca-certificates curl
-curl -fsSL https://packages.kubernetes.io/apt/doc/apt-key.gpg | sudo apt-key add -
-echo "deb https://apt.kubernetes.io/ kubernetes-xenial main" | sudo tee /etc/apt/sources.list.d/kubernetes.list
-sudo apt update && sudo apt install -y kubelet=1.28.0-00 kubeadm=1.28.0-00 kubectl=1.28.0-00
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.29/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.29/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+sudo apt update && sudo apt install -y kubelet=1.29.0-1.1 kubeadm=1.29.0-1.1 kubectl=1.29.0-1.1
 sudo apt-mark hold kubelet kubeadm kubectl
 
 # ── STEP 4: Init control plane (on master-1) ─────────────────────────────
@@ -364,7 +364,7 @@ sudo kubeadm init \
   --control-plane-endpoint "k8s-api.internal:6443" \
   --pod-network-cidr "192.168.0.0/16" \
   --upload-certs \
-  --kubernetes-version "v1.28.0"
+  --kubernetes-version "v1.29.0"
 
 mkdir -p $HOME/.kube
 sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config

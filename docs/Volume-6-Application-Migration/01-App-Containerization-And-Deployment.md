@@ -16,7 +16,7 @@ flowchart TD
         E[Test Container\nlocally] --> F
         F[Push to Harbor\nPrivate Registry] --> G
         G[Write Helm Chart\nfor K8s deployment] --> H
-        H[Deploy to K8s\nStaging namespace] --> I
+        H[Deploy to K8s\nPreProd namespace] --> I
         I{Integration\nTests Pass?}
         I -->|No| J[Fix & Rebuild]
         J --> D
@@ -43,7 +43,7 @@ flowchart TD
 │  App Service Instance        │  Pod (container)                         │
 │  App Service Scale-out 2-5   │  HorizontalPodAutoscaler (min:2, max:5) │
 │  Auto-scale on CPU 70%       │  HPA targetCPUUtilization: 70%          │
-│  Deployment Slots (3)        │  Namespaces: prod, staging, test         │
+│  Deployment Slots (3)        │  Namespaces: prod, preprod, qa           │
 │  Rolling Deployment          │  RollingUpdate strategy maxSurge:1       │
 │  Always On                   │  restartPolicy: Always                   │
 │  Health Check /health        │  livenessProbe + readinessProbe          │
@@ -109,7 +109,7 @@ webapp-chart/
 ├── Chart.yaml
 ├── values.yaml
 ├── values-production.yaml
-├── values-staging.yaml
+├── values-preprod.yaml
 └── templates/
     ├── deployment.yaml
     ├── service.yaml
@@ -345,7 +345,7 @@ stages:
   - test
   - build
   - push
-  - deploy-staging
+  - deploy-preprod
   - integration-test
   - deploy-production
 
@@ -371,14 +371,14 @@ build-image:
     - docker build -t $IMAGE_NAME:$CI_COMMIT_SHA -t $IMAGE_NAME:latest .
     - docker push $IMAGE_NAME:$CI_COMMIT_SHA
 
-deploy-staging:
-  stage: deploy-staging
+deploy-preprod:
+  stage: deploy-preprod
   image: alpine/helm:3.12
   script:
-    - helm upgrade --install webapp-staging ./helm/webapp-chart
-        --namespace staging --create-namespace
+    - helm upgrade --install webapp-preprod ./helm/webapp-chart
+        --namespace preprod --create-namespace
         --set image.tag=$CI_COMMIT_SHA
-        --values ./helm/values-staging.yaml
+        --values ./helm/values-preprod.yaml
         --wait --timeout 5m
 
 integration-tests:
@@ -386,7 +386,7 @@ integration-tests:
   image: postman/newman:latest
   script:
     - newman run tests/integration/webapp.postman_collection.json
-        --env-var base_url=https://staging.company.com
+        --env-var base_url=https://preprod.company.com
 
 deploy-production:
   stage: deploy-production

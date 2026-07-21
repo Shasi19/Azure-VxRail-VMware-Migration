@@ -133,7 +133,7 @@ graph LR
 │  production      │  CPU: 20 cores   │  3–5 webapp     │  webapp, cronjobs  │
 │                  │  MEM: 20 Gi      │  + 2 cronjobs   │  HPA: 2→5          │
 ├──────────────────┼──────────────────┼─────────────────┼────────────────────┤
-│  staging         │  CPU: 8 cores    │  1–2 webapp     │  webapp (staging)  │
+│  preprod         │  CPU: 8 cores    │  1–2 webapp     │  webapp (preprod)  │
 │                  │  MEM: 8 Gi       │                 │  HPA: 1→2          │
 ├──────────────────┼──────────────────┼─────────────────┼────────────────────┤
 │  monitoring      │  CPU: 12 cores   │  Prometheus×2   │  Prometheus        │

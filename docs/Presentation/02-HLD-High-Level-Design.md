@@ -185,8 +185,8 @@ flowchart LR
     end
 
     subgraph K8S_DEPLOY["Kubernetes Deployment"]
-        ARGO --> STAGING["Deploy to\nStaging namespace"]
-        STAGING --> SMOKE["Automated\nSmoke Tests"]
+        ARGO --> PREPROD["Deploy to\nPreProd namespace"]
+        PREPROD --> SMOKE["Automated\nSmoke Tests"]
         SMOKE -->|"Pass"| PROD["Deploy to\nProduction namespace\nRolling update"]
         SMOKE -->|"Fail"| ROLLBACK["Auto Rollback\nto previous version"]
     end
@@ -239,7 +239,7 @@ graph TB
 
 | Decision | Options Considered | Choice | Rationale |
 |----------|-------------------|--------|-----------|
-| Container orchestration | Kubernetes, Docker Swarm, Nomad | **Kubernetes 1.28** | Industry standard, rich ecosystem, HPA, GitOps |
+| Container orchestration | Kubernetes, Docker Swarm, Nomad | **Kubernetes 1.29** | Industry standard, rich ecosystem, HPA, GitOps |
 | DB HA solution | Patroni, Citus, Pgpool-II, Crunchy | **Patroni + etcd** | Battle-tested, automatic failover, K8s-native |
 | Load balancer | F5, HAProxy, NGINX, Keepalived | **F5 BIG-IP** | Enterprise HA, SSL offload, iRules, support |
 | Firewall | Palo Alto, Fortinet, Cisco ASA | **Palo Alto PA-5250** | NGFW + App-ID + SSL inspection, best threat intel |

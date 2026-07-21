@@ -93,7 +93,7 @@ graph TB
 
 | Azure Service | On-Premises Replacement | Migration Tool |
 |---|---|---|
-| Azure Kubernetes Service (AKS) | Self-managed K8s 1.28 (bare metal) | kubeadm, Helm, ArgoCD |
+| Azure Kubernetes Service (AKS) | Self-managed K8s 1.29 (bare metal) | kubeadm, Helm, ArgoCD |
 | Azure Storage Account | MinIO Distributed (S3-compatible) | rclone sync |
 | **Azure Cosmos DB** | **MongoDB Community 7.0 ReplicaSet** | **mongodump / mongorestore + Change Streams** |
 | Azure Container Registry (ACR) | Harbor (private, Trivy scan) | docker push to Harbor |

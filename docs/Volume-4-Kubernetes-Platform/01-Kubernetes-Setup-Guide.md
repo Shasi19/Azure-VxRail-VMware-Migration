@@ -33,7 +33,7 @@ graph TB
 
         subgraph NAMESPACES["Namespaces"]
             NS1["📁 production\n- webapp (3-5 pods)\n- cronjobs"]
-            NS2["📁 staging\n- webapp (1-2 pods)"]
+            NS2["📁 preprod\n- webapp (1-2 pods)"]
             NS3["📁 monitoring\n- Prometheus\n- Grafana\n- Alertmanager"]
             NS4["📁 logging\n- Elasticsearch\n- Logstash\n- Kibana\n- Filebeat"]
             NS5["📁 argocd\n- ArgoCD server"]
@@ -92,13 +92,13 @@ systemctl restart containerd && systemctl enable containerd
 
 # 5. Install kubeadm, kubelet, kubectl
 apt-get install -y apt-transport-https ca-certificates curl gpg
-curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.28/deb/Release.key \
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.29/deb/Release.key \
   | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
 echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] \
-  https://pkgs.k8s.io/core:/stable:/v1.28/deb/ /' \
+  https://pkgs.k8s.io/core:/stable:/v1.29/deb/ /' \
   | tee /etc/apt/sources.list.d/kubernetes.list
 apt-get update
-apt-get install -y kubelet=1.28.0-1.1 kubeadm=1.28.0-1.1 kubectl=1.28.0-1.1
+apt-get install -y kubelet=1.29.0-1.1 kubeadm=1.29.0-1.1 kubectl=1.29.0-1.1
 apt-mark hold kubelet kubeadm kubectl
 systemctl enable kubelet
 ```
@@ -114,7 +114,7 @@ systemctl enable kubelet
 cat <<EOF > /root/kubeadm-config.yaml
 apiVersion: kubeadm.k8s.io/v1beta3
 kind: ClusterConfiguration
-kubernetesVersion: v1.28.0
+kubernetesVersion: v1.29.0
 controlPlaneEndpoint: "k8s-api.internal.company.com:6443"
 networking:
   podSubnet: "192.168.0.0/16"
