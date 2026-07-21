@@ -43,6 +43,7 @@ graph TB
         PG1[(PostgreSQL Primary\nPatroni Leader 10.0.5.1)]
         PG2[(PostgreSQL Standby-1\n10.0.5.2)]
         PG3[(PostgreSQL Standby-2\n10.0.5.3)]
+        MONGO[(MongoDB ReplicaSet\n3-node / 10.0.5.20-22\nReplaces Cosmos DB)]
         REDIS[Redis Cluster\n3+3 nodes / 6GB]
     end
 
@@ -68,6 +69,7 @@ graph TB
     SW --> PODS
     APP --> PGB --> HAP --> PG1
     PG1 -->|streaming replication| PG2 & PG3
+    APP --> MONGO
     APP --> REDIS & MINIO
     NAS -.->|NFS| PODS
     APP --> PROM --> GRAF
@@ -89,34 +91,35 @@ graph TB
 
 ## On-Premises vs Azure: Component Comparison
 
+| Azure Service | On-Premises Replacement | Migration Tool |
+|---|---|---|
+| Azure Kubernetes Service (AKS) | Self-managed K8s 1.28 (bare metal) | kubeadm, Helm, ArgoCD |
+| Azure Storage Account | MinIO Distributed (S3-compatible) | rclone sync |
+| **Azure Cosmos DB** | **MongoDB Community 7.0 ReplicaSet** | **mongodump / mongorestore + Change Streams** |
+| Azure Container Registry (ACR) | Harbor (private, Trivy scan) | docker push to Harbor |
+| Azure Database for PostgreSQL | PostgreSQL 15 + Patroni HA | pglogical live replication |
+| Azure Monitor | Prometheus + Grafana + Alertmanager | Helm chart deploy |
+| Application Insights | Jaeger (tracing) + ELK (logs) | SDK endpoint change |
+| Azure Key Vault | HashiCorp Vault 3-node HA | vault kv migrate |
+| Azure Backup | Bacula + Velero | Scheduled jobs |
+| Azure DevOps / ACR CI/CD | GitLab CI + ArgoCD | Pipeline migration |
+
 ```mermaid
 graph LR
-    subgraph AZURE_COL["Azure Current"]
-        AZ1["Azure Front Door\n+ WAF"]
-        AZ2["Application Gateway\nWAF_v2"]
-        AZ3["App Service 3×P1V2\n.NET on Windows"]
-        AZ4["PostgreSQL Managed\nPG 11 | Zone HA"]
-        AZ5["Redis Cache Premium\n6 GB Cluster"]
-        AZ6["Azure Blob Storage\n2.5 TB RA-GRS"]
-        AZ7["Azure Monitor\n+ App Insights"]
-        AZ8["Log Analytics\n30-day retention"]
-        AZ9["Azure Key Vault\nPremium"]
-        AZ10["Azure Backup\n+ Site Recovery"]
-        AZ11["Azure DevOps\nCI/CD"]
+    subgraph AZURE_COL["Azure Current - Per Environment"]
+        AZ1["AKS\nKubernetes Service"]
+        AZ2["Storage Account\nBlob/File/Queue"]
+        AZ3["Azure Cosmos DB\nNoSQL Documents"]
+        AZ4["ACR\nContainer Registry"]
+        AZ5["PostgreSQL\nManaged PG11"]
     end
 
-    subgraph ONPREM_COL["On-Premises Target"]
-        OP1["Palo Alto PA-5250\nNGFW HA Pair"]
-        OP2["F5 BIG-IP 5200\nActive/Passive HA"]
-        OP3["K8s Pods\n.NET on Linux\nHPA 2-5 replicas"]
-        OP4["PostgreSQL 15\nPatroni HA | 3-node"]
-        OP5["Redis Cluster\n3+3 nodes | 6 GB"]
-        OP6["MinIO Distributed\n10 TB NVMe NAS"]
-        OP7["Prometheus\n+ Grafana + Jaeger"]
-        OP8["ELK Stack\nUnlimited retention"]
-        OP9["HashiCorp Vault\n3-node HA"]
-        OP10["Bacula + Velero\nDaily + WAL archive"]
-        OP11["GitLab CI\n+ ArgoCD GitOps"]
+    subgraph ONPREM_COL["On-Premises Target - Per Environment"]
+        OP1["Kubernetes\nnamespace per env"]
+        OP2["MinIO\nS3-compatible"]
+        OP3["MongoDB 7.0\n3-node ReplicaSet"]
+        OP4["Harbor\nTrivy scan"]
+        OP5["PostgreSQL 15\nPatroni HA"]
     end
 
     AZ1 -->|replaces| OP1
@@ -124,12 +127,6 @@ graph LR
     AZ3 -->|replaces| OP3
     AZ4 -->|replaces| OP4
     AZ5 -->|replaces| OP5
-    AZ6 -->|replaces| OP6
-    AZ7 -->|replaces| OP7
-    AZ8 -->|replaces| OP8
-    AZ9 -->|replaces| OP9
-    AZ10 -->|replaces| OP10
-    AZ11 -->|replaces| OP11
 
     style AZURE_COL fill:#e8f4fd,stroke:#0078D4
     style ONPREM_COL fill:#e8f5e9,stroke:#2e7d32

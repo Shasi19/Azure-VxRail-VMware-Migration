@@ -7,42 +7,42 @@
 
 ## Azure Architecture — Full Stack Diagram
 
-> **Note**: Architecture comprises 4 separate Virtual Networks across 4 Resource Groups, all connected via the `Sub-AFRPS-AF-INT` hub subscription. Each workload VNet contains its own AKS cluster, Storage Account, Container Registry, and PostgreSQL database. Monitoring and Observability resources are centralised in the shared RG `rg-dls-coe-we-001`.
+> **Note**: Architecture comprises 4 environments (Dev, QA, Pre-Prod, Prod) — each in its own Virtual Network and Resource Group, all connected via the `Sub-AFRPS-AF-INT` hub subscription. Every environment has the identical stack: **AKS + Storage Account + Azure Cosmos DB + Azure Container Registry + Azure Database for PostgreSQL**. Monitoring and Observability are centralised in the shared RG `rg-dls-coe-we-001`.
 
 ```mermaid
 graph TB
     HUB[Sub-AFRPS-AF-INT\nHub / Shared Subscription]
 
-    subgraph RG1["rg-ae-prod-we-001  West Europe"]
-        VNET1[Virtual Network]
+    subgraph RG1["rg-ae-prod-we-001  Dev Environment"]
         AKS1[Azure Kubernetes Service\nUDR routed]
-        ACR1[Azure Container Registry\nUDR]
-        ACI1[Azure Container Instances\nBatch / ETL]
         SA1[Storage Account\nUDR]
+        COSMOS1[(Azure Cosmos DB\nUDR)]
+        ACR1[Azure Container Registry\nUDR]
         PG1[(Azure Database\nfor PostgreSQL\nUDR)]
     end
 
-    subgraph RG2["rg-cv-prod-we-001  West Europe"]
-        VNET2[Virtual Network]
+    subgraph RG2["rg-cv-preprod-we-001  QA Environment"]
         AKS2[Azure Kubernetes Service\nUDR routed]
-        ACR2[Azure Container Registry]
-        SA2[Storage Account]
-        PG2[(Azure Database\nfor PostgreSQL)]
+        SA2[Storage Account\nUDR]
+        COSMOS2[(Azure Cosmos DB\nUDR)]
+        ACR2[Azure Container Registry\nUDR]
+        PG2[(Azure Database\nfor PostgreSQL\nUDR)]
     end
 
-    subgraph RG3["rg-as-las-we-001  West Europe"]
-        VNET3[Virtual Network]
+    subgraph RG3["rg-as-las-we-001  Pre-Prod Environment"]
         AKS3[Azure Kubernetes Service\nUDR routed]
-        ACR3[Azure Container Registry\nUDR]
-        ACI3[Azure Container Instances]
         SA3[Storage Account\nUDR]
+        COSMOS3[(Azure Cosmos DB\nUDR)]
+        ACR3[Azure Container Registry\nUDR]
         PG3[(Azure Database\nfor PostgreSQL\nUDR)]
     end
 
-    subgraph RG4["rg-dls-coe-we-001  Shared Services"]
-        VNET4[Virtual Network]
-        PG4[(Azure Database\nfor PostgreSQL\nShared / CoE)]
-        UDR4[UDR Route Table]
+    subgraph RG4["rg-dls-coe-we-001  Production + Shared Monitoring"]
+        AKS4[Azure Kubernetes Service\nUDR routed]
+        SA4[Storage Account\nUDR]
+        COSMOS4[(Azure Cosmos DB\nUDR)]
+        ACR4[Azure Container Registry\nUDR]
+        PG4[(Azure Database\nfor PostgreSQL\nUDR)]
         MON[Azure Monitor]
         AI[Application Insights]
     end
@@ -52,28 +52,34 @@ graph TB
     HUB -->|VNet Peering / UDR| RG3
     HUB -->|VNet Peering / UDR| RG4
 
-    AKS1 --> ACR1
     AKS1 --> SA1
+    AKS1 --> COSMOS1
+    AKS1 --> ACR1
     AKS1 --> PG1
-    ACI1 --> PG1
 
-    AKS2 --> ACR2
     AKS2 --> SA2
+    AKS2 --> COSMOS2
+    AKS2 --> ACR2
     AKS2 --> PG2
 
-    AKS3 --> ACR3
     AKS3 --> SA3
+    AKS3 --> COSMOS3
+    AKS3 --> ACR3
     AKS3 --> PG3
-    ACI3 --> PG3
 
+    AKS4 --> SA4
+    AKS4 --> COSMOS4
+    AKS4 --> ACR4
+    AKS4 --> PG4
+    AKS4 -.->|metrics / logs| MON
     AKS1 -.->|metrics / logs| MON
     AKS2 -.->|metrics / logs| MON
     AKS3 -.->|metrics / logs| MON
     MON --> AI
 
-    style RG1 fill:#e8f4fd,stroke:#0078D4
-    style RG2 fill:#e8f5e9,stroke:#107C41
-    style RG3 fill:#fff3e0,stroke:#c67b00
+    style RG1 fill:#e3f2fd,stroke:#1565c0
+    style RG2 fill:#e8f5e9,stroke:#2e7d32
+    style RG3 fill:#fff3e0,stroke:#e65100
     style RG4 fill:#fce4ec,stroke:#880e4f
 ```
 
@@ -83,37 +89,40 @@ graph TB
 
 | Category | Services | Monthly Cost | Share |
 |----------|---------|-------------|-------|
-| Compute | AKS clusters (3× workload VNets) + Container Instances | $17,000 | 37% |
-| Data | PostgreSQL (4 instances) + Storage Accounts | $16,000 | 35% |
-| Networking | VNet Peering + UDR + Load Balancers | $3,000 | 7% |
-| Monitoring | Azure Monitor + App Insights + Log Analytics | $4,500 | 10% |
-| Security | Container Registry + Key Vault + Security Center | $1,500 | 3% |
-| Backup and DR | Backup Vault + Site Recovery | $4,000 | 9% |
+| Compute | AKS clusters (4 environments) | $15,000 | 33% |
+| Data — SQL | PostgreSQL (4 instances, one per env) | $8,000 | 17% |
+| Data — NoSQL | Azure Cosmos DB (4 instances, one per env) | $10,000 | 22% |
+| Storage | Storage Accounts (4, one per env) | $3,000 | 7% |
+| Registry | Azure Container Registry (4, one per env) | $1,500 | 3% |
+| Networking | VNet Peering + UDR + Load Balancers | $2,500 | 5% |
+| Monitoring | Azure Monitor + App Insights (shared) | $4,000 | 9% |
+| Backup and DR | Backup Vault + Site Recovery | $2,000 | 4% |
 | **Total** | | **$46,000/mo** | **100%** |
 
 ```mermaid
 pie title Azure Monthly Cost $46,000
-    "Compute AKS $17k" : 37
-    "Data PG/Storage $16k" : 35
-    "Monitoring $4.5k" : 10
-    "Backup/DR $4k" : 9
-    "Networking $3k" : 7
-    "Security/ACR $1.5k" : 3
+    "Compute AKS $15k" : 33
+    "Cosmos DB $10k" : 22
+    "PostgreSQL $8k" : 17
+    "Monitoring $4k" : 9
+    "Storage and ACR $4.5k" : 10
+    "Networking $2.5k" : 5
+    "Backup $2k" : 4
 ```
 
 ---
 
-## Azure Network Topology — Hub and Spoke
+## Azure Network Topology — Hub and Spoke (4 Environments)
 
 ```mermaid
 graph TB
-    HUB[Sub-AFRPS-AF-INT\nHub Subscription\nCentralised Connectivity]
+    HUB[Sub-AFRPS-AF-INT\nHub Subscription]
 
     subgraph WE["West Europe Region"]
-        V1[rg-ae-prod-we-001\nAKS + ACR + Storage + PostgreSQL]
-        V2[rg-cv-prod-we-001\nAKS + ACR + Storage + PostgreSQL]
-        V3[rg-as-las-we-001\nAKS + ACR + Storage + PostgreSQL]
-        V4[rg-dls-coe-we-001\nPostgreSQL + Monitor + App Insights]
+        V1[Dev  rg-ae-prod-we-001\nAKS - Storage - CosmosDB - ACR - PostgreSQL]
+        V2[QA  rg-cv-preprod-we-001\nAKS - Storage - CosmosDB - ACR - PostgreSQL]
+        V3[Pre-Prod  rg-as-las-we-001\nAKS - Storage - CosmosDB - ACR - PostgreSQL]
+        V4[Prod  rg-dls-coe-we-001\nAKS - Storage - CosmosDB - ACR - PostgreSQL\nAzure Monitor - App Insights]
     end
 
     HUB -->|UDR + VNet Peering| V1
@@ -127,9 +136,9 @@ graph TB
 
     style HUB fill:#0078D4,color:#fff
     style WE fill:#e8f4fd,stroke:#0078D4
-    style V1 fill:#dceefb,stroke:#0078D4
-    style V2 fill:#dceefb,stroke:#0078D4
-    style V3 fill:#dceefb,stroke:#0078D4
+    style V1 fill:#e3f2fd,stroke:#1565c0
+    style V2 fill:#e8f5e9,stroke:#2e7d32
+    style V3 fill:#fff3e0,stroke:#e65100
     style V4 fill:#fce4ec,stroke:#880e4f
 ```
 

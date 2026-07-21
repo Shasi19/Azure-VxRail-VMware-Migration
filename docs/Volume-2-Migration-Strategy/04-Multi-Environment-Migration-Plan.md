@@ -193,6 +193,7 @@ kubectl label node worker-2 env=dev-qa
 
 ### Dev Database Migration
 
+**PostgreSQL migration:**
 ```bash
 # On Azure PostgreSQL (source)
 pg_dump -h <azure-pg-host> -U adminuser -d devdb \
@@ -212,13 +213,37 @@ psql -h 10.0.5.1 -U postgres -d devdb \
   -c "SELECT schemaname, tablename, n_live_tup FROM pg_stat_user_tables ORDER BY n_live_tup DESC LIMIT 20;"
 ```
 
+**Cosmos DB → MongoDB migration (dev):**
+```bash
+# Export from Azure Cosmos DB (MongoDB API)
+mongodump \
+  --uri "mongodb://<cosmos-account>:<key>@<cosmos-account>.mongo.cosmos.azure.com:10255/dev-cosmos?ssl=true&replicaSet=globaldb&retrywrites=false" \
+  --out /backup/cosmos-export/dev/
+
+# Restore to on-prem MongoDB (standalone dev node)
+mongorestore \
+  --host 10.0.5.20:27017 \
+  --username dev_user \
+  --password "$(vault kv get -field=password secret/dev/mongodb)" \
+  --authenticationDatabase admin \
+  --db dev-cosmos \
+  /backup/cosmos-export/dev/dev-cosmos/
+
+# Verify document counts per collection
+mongosh --host 10.0.5.20 --eval '
+  db = db.getSiblingDB("dev-cosmos");
+  db.getCollectionNames().forEach(c => print(c + ": " + db[c].countDocuments()));
+'
+```
+
 ### Go/No-Go Gate — Dev
 
 | Criterion | Pass Condition | Check Method |
 |-----------|---------------|-------------|
 | All pods running | `kubectl get pods -n dev` = all Running | kubectl |
 | App responding | HTTP 200 on /health | curl from inside cluster |
-| DB data correct | Row counts match Azure | pg_dump + count compare |
+| PostgreSQL data correct | Row counts match Azure | pg_dump + count compare |
+| MongoDB data correct | Document counts match Cosmos DB | mongosh count compare |
 | CI/CD pipeline | GitLab pushes → ArgoCD deploys | Test commit |
 | Logs appearing | ELK receives dev namespace logs | Kibana query |
 | Metrics collected | Grafana shows dev pod metrics | Visual check |

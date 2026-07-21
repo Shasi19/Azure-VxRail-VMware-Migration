@@ -56,6 +56,7 @@
 | [04 Azure Architecture Visual](docs/Volume-1-Executive-Architecture/04-Azure-Architecture-Visual.md) | Full Mermaid diagram of current Azure stack (4-VNet hub-spoke) |
 | [05 On-Prem Architecture Visual](docs/Volume-1-Executive-Architecture/05-OnPrem-Architecture-Visual.md) | Full Mermaid diagram of target on-prem stack + VLAN map |
 | [06 Component Purpose Guide](docs/Volume-1-Executive-Architecture/06-Component-Purpose-Guide.md) | NEW — What every tool does, why chosen, Azure equivalent |
+| [07 Per-Environment Architecture](docs/Volume-1-Executive-Architecture/07-Per-Environment-Architecture.md) | NEW — Dev/QA/PreProd/Prod on-prem stack with MongoDB per env |
 
 ### Volume 2: Migration Strategy
 | Doc | Description |

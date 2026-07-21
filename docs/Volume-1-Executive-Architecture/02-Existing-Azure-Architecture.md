@@ -5,47 +5,55 @@
 
 ## Current Azure Infrastructure Overview
 
+> **Architecture Pattern**: Hub-and-Spoke, 4 identical environments, West Europe region.
+> Each environment has the **same 5-service stack**: AKS + Storage + Cosmos DB + ACR + PostgreSQL.
+
 ### Azure Services Inventory
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │   AZURE CLOUD INFRASTRUCTURE  (Hub-and-Spoke, West Europe)              │
+│   4 ENVIRONMENTS — Dev, QA, Pre-Prod, Production                        │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
 │   Sub-AFRPS-AF-INT  ─  Hub Subscription (Centralised Connectivity)      │
-│   UDR Route Tables on all workload VNets → Hub                          │
+│   UDR Route Tables on all environment VNets -> Hub                      │
 │                                                                         │
 │  ┌──────────────────────────────────────────────────────────────────┐   │
-│  │  rg-ae-prod-we-001   (VNet 1)                                    │   │
+│  │  rg-ae-prod-we-001   DEV Environment                             │   │
 │  │  ├─ Azure Kubernetes Service (AKS) + UDR                        │   │
+│  │  ├─ Azure Storage Account + UDR                                 │   │
+│  │  ├─ Azure Cosmos DB + UDR                                       │   │
 │  │  ├─ Azure Container Registry (ACR) + UDR                        │   │
-│  │  ├─ Azure Container Instances (Batch/ETL) + UDR                 │   │
-│  │  ├─ Storage Account + UDR                                       │   │
 │  │  └─ Azure Database for PostgreSQL + UDR                         │   │
 │  └──────────────────────────────────────────────────────────────────┘   │
 │                                                                         │
 │  ┌──────────────────────────────────────────────────────────────────┐   │
-│  │  rg-cv-prod-we-001   (VNet 2)                                    │   │
-│  │  ├─ Azure Kubernetes Service (AKS)                              │   │
-│  │  ├─ Azure Container Registry (ACR)                              │   │
-│  │  ├─ Storage Account                                             │   │
-│  │  └─ Azure Database for PostgreSQL                               │   │
-│  └──────────────────────────────────────────────────────────────────┘   │
-│                                                                         │
-│  ┌──────────────────────────────────────────────────────────────────┐   │
-│  │  rg-as-las-we-001   (VNet 3)                                     │   │
+│  │  rg-cv-preprod-we-001   QA Environment                           │   │
 │  │  ├─ Azure Kubernetes Service (AKS) + UDR                        │   │
+│  │  ├─ Azure Storage Account + UDR                                 │   │
+│  │  ├─ Azure Cosmos DB + UDR                                       │   │
 │  │  ├─ Azure Container Registry (ACR) + UDR                        │   │
-│  │  ├─ Azure Container Instances + UDR                             │   │
-│  │  ├─ Storage Account + UDR                                       │   │
 │  │  └─ Azure Database for PostgreSQL + UDR                         │   │
 │  └──────────────────────────────────────────────────────────────────┘   │
 │                                                                         │
 │  ┌──────────────────────────────────────────────────────────────────┐   │
-│  │  rg-dls-coe-we-001   (VNet 4 — Shared Services / CoE)           │   │
-│  │  ├─ Azure Database for PostgreSQL (shared/CoE instance)         │   │
-│  │  ├─ UDR Route Table                                             │   │
-│  │  ├─ Azure Monitor                                               │   │
+│  │  rg-as-las-we-001   Pre-Production Environment                   │   │
+│  │  ├─ Azure Kubernetes Service (AKS) + UDR                        │   │
+│  │  ├─ Azure Storage Account + UDR                                 │   │
+│  │  ├─ Azure Cosmos DB + UDR                                       │   │
+│  │  ├─ Azure Container Registry (ACR) + UDR                        │   │
+│  │  └─ Azure Database for PostgreSQL + UDR                         │   │
+│  └──────────────────────────────────────────────────────────────────┘   │
+│                                                                         │
+│  ┌──────────────────────────────────────────────────────────────────┐   │
+│  │  rg-dls-coe-we-001   Production Environment + Shared Monitoring  │   │
+│  │  ├─ Azure Kubernetes Service (AKS) + UDR                        │   │
+│  │  ├─ Azure Storage Account + UDR                                 │   │
+│  │  ├─ Azure Cosmos DB + UDR                                       │   │
+│  │  ├─ Azure Container Registry (ACR) + UDR                        │   │
+│  │  ├─ Azure Database for PostgreSQL + UDR                         │   │
+│  │  ├─ Azure Monitor (centralised telemetry from all envs)         │   │
 │  │  └─ Application Insights                                        │   │
 │  └──────────────────────────────────────────────────────────────────┘   │
 │                                                                         │
@@ -142,7 +150,31 @@ Each workload VNet:
 
 ### 3. Data Layer
 
-#### Azure Database for PostgreSQL
+#### Azure Cosmos DB (NoSQL — per environment)
+
+```
+One Cosmos DB account per environment (4 total):
+├─ API: Core (SQL/NoSQL) — document-oriented
+├─ Consistency: Session consistency (default)
+├─ Replication: Single-region (West Europe)
+├─ Throughput: Autoscale (400–4000 RU/s)
+├─ Partition key: Per-collection design
+├─ Indexing: Automatic (all fields)
+├─ TTL: Enabled for session/cache collections
+└─ Private Endpoint: VNet-integrated
+
+Collections / Containers (typical):
+├─ sessions       — User session documents (TTL: 24h)
+├─ audit_logs     — Immutable audit trail
+├─ notifications  — Event/notification queue
+├─ config         — Dynamic application configuration
+└─ analytics      — Aggregated analytics snapshots
+
+Cost per environment: ~$2,500/month (autoscale)
+Total (4 environments):  ~$10,000/month
+```
+
+#### Azure Database for PostgreSQL (per environment)
 
 ```
 Configuration:

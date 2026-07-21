@@ -32,6 +32,7 @@
 | Velero | Azure Backup (K8s) | Snapshot and restore entire Kubernetes namespaces |
 | Wazuh SIEM | Azure Sentinel | Detect threats, collect security events, trigger alerts |
 | cert-manager | Azure-managed certificates | Auto-issue and renew TLS certificates inside Kubernetes |
+| **MongoDB 7.0 ReplicaSet** | **Azure Cosmos DB** | **NoSQL document store — sessions, audit logs, notifications, app config** |
 
 ---
 
@@ -262,7 +263,66 @@ If a master dies → its replica is promoted automatically
 
 ---
 
-### 12. MinIO
+### 12. MongoDB 7.0 ReplicaSet
+**Category**: Data — NoSQL Document Database
+**Replaces**: Azure Cosmos DB
+
+**What it does:**
+MongoDB is a NoSQL document database that stores data as JSON-like documents (BSON). Instead of rows and columns like PostgreSQL, MongoDB stores flexible, schema-free documents — perfect for data that varies in shape (e.g., a notification document might have different fields per notification type). Applications connect to MongoDB for any non-relational data: user sessions, audit logs, application events, notifications, and dynamic configuration.
+
+**Why it replaces Cosmos DB:**
+Azure Cosmos DB is Microsoft's managed NoSQL service. Its most popular API is the MongoDB-compatible API — meaning most applications already use the MongoDB driver to talk to Cosmos DB. Migrating to self-hosted MongoDB Community Edition requires **only an endpoint URL change** in the application connection string. All queries, indexes, and aggregation pipelines work identically.
+
+**Architecture per environment:**
+```
+Dev:      Standalone  (1 node — no HA, saves resources)
+QA:       Standalone  (1 node — no HA, saves resources)
+Pre-Prod: ReplicaSet  (1 Primary + 1 Secondary — HA for load testing)
+Prod:     ReplicaSet  (1 Primary + 2 Secondaries — full HA, writeConcern: majority)
+```
+
+**What is stored in MongoDB (per environment):**
+```
+Collection: sessions
+  → User login tokens, preferences (TTL: 24h auto-expire)
+  → Was in Redis, but richer document structure needed
+
+Collection: audit_logs
+  → Who did what, when, from where (immutable, append-only)
+  → Schema varies per action type — perfect for documents
+
+Collection: notifications
+  → Push notifications, email queue, in-app alerts
+  → Rich nested structure (recipient, channels, template, payload)
+
+Collection: config
+  → Feature flags, environment-specific settings
+  → Updated without redeployment
+
+Collection: analytics
+  → Pre-aggregated dashboard data (5-min snapshots)
+  → Saves complex SQL queries at dashboard load time
+```
+
+**Key MongoDB features in use:**
+- **ReplicaSet** — automatic failover, data redundancy, read from secondaries
+- **Change Streams** — real-time event sourcing, used for live replication during migration
+- **TTL indexes** — automatically expire session documents after 24 hours
+- **Aggregation Pipeline** — analytics queries computed in the database, not the app
+- **Atlas Migration Tool / mongodump** — official migration tool from Cosmos DB
+
+**Connection string change (all that's needed for most apps):**
+```
+# Before (Azure Cosmos DB)
+mongodb://<account>:<key>@<account>.mongo.cosmos.azure.com:10255/prod-cosmos?ssl=true
+
+# After (on-prem MongoDB — same driver, same queries)
+mongodb://prod_user:<vault-secret>@10.0.5.25:27017,10.0.5.26:27017,10.0.5.27:27017/prod-cosmos?replicaSet=rs-prod&tls=true
+```
+
+---
+
+### 13. MinIO
 **Category**: Storage — Object Storage
 **Replaces**: Azure Blob Storage
 
@@ -277,7 +337,7 @@ MinIO provides an S3-compatible API for storing files, documents, images, export
 
 ---
 
-### 13. NetApp AFF A250
+### 14. NetApp AFF A250
 **Category**: Storage — Shared NFS Storage
 **Replaces**: Azure Disk (Persistent Volumes) + Azure Files
 
@@ -289,7 +349,7 @@ NetApp AFF (All-Flash FAS) uses NVMe SSDs — 300,000+ IOPS with sub-millisecond
 
 ---
 
-### 14. Prometheus
+### 15. Prometheus
 **Category**: Observability — Metrics Collection
 **Replaces**: Azure Monitor (metrics)
 
@@ -306,7 +366,7 @@ Prometheus scrapes (collects) numeric metrics from every component every 15 seco
 
 ---
 
-### 15. Grafana
+### 16. Grafana
 **Category**: Observability — Dashboards and Alerting UI
 **Replaces**: Azure Monitor Dashboards
 
@@ -323,7 +383,7 @@ Grafana is the visual layer on top of Prometheus. It reads Prometheus data and d
 
 ---
 
-### 16. Alertmanager
+### 17. Alertmanager
 **Category**: Observability — Alert Routing
 **Replaces**: Azure Monitor Alerts + Action Groups
 
@@ -332,7 +392,7 @@ Alertmanager receives alerts from Prometheus and routes them to the right people
 
 ---
 
-### 17. ELK Stack (Elasticsearch + Logstash + Kibana)
+### 18. ELK Stack (Elasticsearch + Logstash + Kibana)
 **Category**: Observability — Log Management
 **Replaces**: Azure Log Analytics + Azure Monitor Logs
 
@@ -348,7 +408,7 @@ Azure Log Analytics charges per GB ingested ($2.76/GB). ELK runs on your hardwar
 
 ---
 
-### 18. Jaeger
+### 19. Jaeger
 **Category**: Observability — Distributed Tracing
 **Replaces**: Azure Application Insights (distributed tracing)
 
@@ -357,7 +417,7 @@ When a user request comes in, it may touch 5-10 different services (Ingress → 
 
 ---
 
-### 19. HashiCorp Vault
+### 20. HashiCorp Vault
 **Category**: Security — Secrets Management
 **Replaces**: Azure Key Vault
 
@@ -372,7 +432,7 @@ Vault stores and manages secrets (passwords, API keys, certificates, encryption 
 
 ---
 
-### 20. Bacula
+### 21. Bacula
 **Category**: Data Protection — Traditional Backup
 **Replaces**: Azure Backup
 
@@ -386,7 +446,7 @@ Bacula runs scheduled backup jobs every night at 2 AM. It backs up PostgreSQL da
 
 ---
 
-### 21. Velero
+### 22. Velero
 **Category**: Data Protection — Kubernetes Backup
 **Replaces**: Azure Backup for AKS
 
@@ -395,7 +455,7 @@ While Bacula backs up raw files, Velero specifically understands Kubernetes. It 
 
 ---
 
-### 22. cert-manager
+### 23. cert-manager
 **Category**: Security — TLS Certificate Automation
 **Replaces**: Azure-managed certificates
 
@@ -420,8 +480,9 @@ COMPUTE LAYER
 └── GitLab CI          → "The builder": compile, test, scan, and package code
 
 DATA LAYER
-├── PostgreSQL+Patroni → "The database": store and retrieve application data, auto-failover
-├── HAProxy            → "The DB traffic cop": send writes to primary, reads to replicas
+├── PostgreSQL+Patroni → "The relational database": store and retrieve structured app data, auto-failover
+├── MongoDB ReplicaSet → "The document store": store flexible NoSQL data (replaces Cosmos DB)
+├── HAProxy            → "The DB traffic cop": send writes to PG primary, reads to replicas
 ├── PgBouncer          → "The connection recycler": prevent DB connection exhaustion
 ├── Redis              → "The fast memory": cache hot data so DB is not hit every time
 ├── MinIO              → "The file store": store uploaded files, exports, backups (S3 API)

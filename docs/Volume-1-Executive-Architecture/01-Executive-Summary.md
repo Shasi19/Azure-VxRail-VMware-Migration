@@ -234,16 +234,16 @@ Storage I/O               2,000 IOPS     5,000 IOPS   +35%/year
 
 | Azure Service | Current Usage | Purpose |
 |---|---|---|
-| Azure Kubernetes Service (AKS) | 3 clusters (one per workload VNet) | Containerised application hosting |
-| Azure Container Instances | rg-ae, rg-as-las VNets | Batch jobs, scheduled ETL tasks |
-| Azure Container Registry (ACR) | 3 instances (one per workload VNet) | Private container image registry |
-| PostgreSQL Database | 4 instances (one per VNet incl. CoE) | Production databases per workload |
-| Storage Accounts | 3 workload VNets | File storage, blob, backups |
-| Virtual Network (Hub-Spoke) | 4 VNets + Sub-AFRPS-AF-INT hub | Network isolation + UDR routing |
+| Azure Kubernetes Service (AKS) | 4 clusters (one per environment VNet) | Containerised application hosting |
+| Azure Cosmos DB | 4 instances (one per environment VNet) | NoSQL document store — sessions, audit logs, notifications |
+| Azure Container Registry (ACR) | 4 instances (one per environment VNet) | Private container image registry |
+| PostgreSQL Database | 4 instances (one per environment VNet) | Relational production databases |
+| Storage Accounts | 4 instances (one per environment VNet) | File storage, blob, backups |
+| Virtual Network (Hub-Spoke) | 4 environment VNets + Sub-AFRPS-AF-INT hub | Network isolation + UDR routing |
 | Azure Monitor | rg-dls-coe-we-001 (centralised) | Metrics and monitoring |
 | Application Insights | rg-dls-coe-we-001 | APM and diagnostics |
-| UDR (User Defined Routes) | All workload VNets | Force-tunnel to hub subscription |
-| Azure Backup | Yes | Data protection |
+| UDR (User Defined Routes) | All environment VNets | Force-tunnel to hub subscription |
+| Azure Backup | All environments | Data protection |
 
 ---
 
