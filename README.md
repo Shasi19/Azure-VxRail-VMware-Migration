@@ -138,6 +138,27 @@ Two complete deployment paths for setting up the on-premises environment:
 
 ---
 
+### KVM and OLVM Complete Guide
+> Deep-dive reference for KVM hypervisor and OLVM (Oracle Linux Virtualization Manager). Covers installation, networking, storage, security, best practices, VM creation, Kubernetes, monitoring, HTTPS certs, and backup.
+
+| # | Doc | Contents |
+|---|-----|----------|
+| 00 | [Index](docs/KVM-OLVM-Guide/00-Index.md) | KVM vs OLVM comparison, Azure service mapping, architecture |
+| 01 | [KVM Installation](docs/KVM-OLVM-Guide/01-KVM-Installation.md) | Install on OL9/RHEL9/Ubuntu22, SELinux/AppArmor, verify, quick test |
+| 02 | [OLVM Installation](docs/KVM-OLVM-Guide/02-OLVM-Installation.md) | Engine setup, add KVM hosts, storage domains, logical networks, HA, REST API |
+| 03 | [KVM Networking](docs/KVM-OLVM-Guide/03-KVM-Networking.md) | Linux bridge, bonding, VLANs, macvtap, OVS, SR-IOV, firewall, troubleshooting |
+| 04 | [KVM Storage](docs/KVM-OLVM-Guide/04-KVM-Storage.md) | QCOW2, LVM, NFS, iSCSI, snapshots, dirty bitmap incremental, performance tuning |
+| 05 | [KVM Security](docs/KVM-OLVM-Guide/05-KVM-Security.md) | sVirt, SELinux, AppArmor, TLS for libvirt, VM isolation, audit logging, secrets |
+| 06 | [KVM Best Practices](docs/KVM-OLVM-Guide/06-KVM-Best-Practices.md) | CPU pinning, NUMA, hugepages, KSM, live migration, monitoring, prod checklist |
+| 07 | [Creating VMs](docs/KVM-OLVM-Guide/07-Creating-VMs.md) | virt-install, cloud-init, bulk creation script, QEMU guest agent, templates, OLVM UI |
+| 08 | [OLVM HTTPS Certificate](docs/KVM-OLVM-Guide/08-OLVM-HTTPS-Certificate.md) | Internal CA, Let's Encrypt, DNS challenge, auto-renewal, cert monitoring |
+| 09 | [Kubernetes on KVM](docs/KVM-OLVM-Guide/09-Kubernetes-on-KVM.md) | Provision VMs in OLVM, kubeadm HA, Calico, keepalived VIP, node labels, upgrades |
+| 10 | [OLVM Backup](docs/KVM-OLVM-Guide/10-OLVM-Backup.md) | engine-backup, export domain, OVA download, snapshot schedule, REST API automation |
+| 11 | [Monitoring and Logging](docs/KVM-OLVM-Guide/11-Monitoring-Logging.md) | node_exporter, libvirt-exporter, OLVM DWH+Grafana, ELK, guest agent metrics, alerts |
+| 12 | [Backup and Recovery](docs/KVM-OLVM-Guide/12-Backup-Recovery.md) | Cold backup, live snapshot+blockcommit, dirty bitmaps, Bacula, MinIO, DR runbook |
+
+---
+
 ## 🗓️ High-Level Timeline
 
 ```
