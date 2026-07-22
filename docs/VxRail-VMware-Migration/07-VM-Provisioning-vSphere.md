@@ -11,7 +11,7 @@
 ## 1. Prepare Oracle Linux 9 Cloud Image Template
 
 > **VM Operating System: Oracle Linux 9 (OL9)** — your team will use Oracle Linux VMs.  
-> For full OL9 template setup, cloud-init, and installation details, see [13-Oracle-Linux-VMs.md](13-Oracle-Linux-VMs.md).
+> For full OL9 template setup, cloud-init, and installation details, see [06-Oracle-Linux-VMs.md](06-Oracle-Linux-VMs.md).
 
 This template is used to clone all K8s and database VMs.
 
@@ -45,7 +45,7 @@ govc vm.create \
   ol9-base-template
 
 # Install OL9 via vCenter console, then customize (dnf update, open-vm-tools, cloud-init)
-# See 13-Oracle-Linux-VMs.md Section 1.4 for full post-install steps
+# See 06-Oracle-Linux-VMs.md Section 1.4 for full post-install steps
 
 # Mark as template
 govc vm.markastemplate ol9-base-template

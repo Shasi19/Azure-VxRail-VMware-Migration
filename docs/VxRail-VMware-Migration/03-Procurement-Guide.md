@@ -164,7 +164,7 @@ Deploy `step-ca` (Smallstep) or use `openssl` to build your own Certificate Auth
 ```bash
 # No purchase needed — deploy as a VM on VxRail
 # Covers: *.internal.company.com
-# See 11-Initial-Setup-Before-Migration.md for step-ca setup
+# See 04-Initial-Setup-Before-Migration.md for step-ca setup
 ```
 
 ### 4.2 Option B — Commercial Wildcard Certificate (Easy, ~$100–$500/year)
@@ -286,16 +286,16 @@ sudo ln -s /opt/kubectx/kubectx /usr/local/bin/kubectx
 sudo ln -s /opt/kubectx/kubens /usr/local/bin/kubens
 
 # Ansible — for parallel SSH commands to all nodes
-sudo apt install -y ansible
+sudo dnf install -y ansible
 
 # PostgreSQL client (for remote pg_dump)
-sudo apt install -y postgresql-client-15
+sudo dnf install -y postgresql15
 
 # MongoDB tools (for mongodump)
 wget -qO - https://www.mongodb.org/static/pgp/server-7.0.asc | sudo apt-key add -
 echo "deb [ arch=amd64 ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" \
   | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
-sudo apt update && sudo apt install -y mongodb-mongosh mongodb-database-tools
+sudo dnf install -y mongodb-mongosh mongodb-database-tools
 
 # Azure CLI (for accessing Azure resources during migration)
 curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
@@ -310,7 +310,7 @@ curl -fsSL https://github.com/vmware-tanzu/velero/releases/download/${VELERO_VER
   | tar -xzf - && sudo mv velero-${VELERO_VERSION}-linux-amd64/velero /usr/local/bin/
 
 # cloud-localds (for creating cloud-init ISOs)
-sudo apt install -y cloud-image-utils
+sudo dnf install -y cloud-utils-growpart cloud-init
 
 # step CLI (for internal CA)
 wget https://dl.smallstep.com/gh-release/cli/gh-release-header/v0.25.0/step_linux_0.25.0_amd64.tar.gz

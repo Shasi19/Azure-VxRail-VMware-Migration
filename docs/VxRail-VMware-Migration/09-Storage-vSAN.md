@@ -217,7 +217,7 @@ MinIO runs as a single-node container on `minio-01` VM backed by a large vSAN VM
 ### 4.1 Install MinIO on minio-01
 
 ```bash
-ssh ubuntu@10.0.6.11
+ssh oracle@10.0.6.11
 
 # Create data directory backed by vSAN disk
 sudo mkdir -p /data/minio

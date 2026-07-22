@@ -165,7 +165,7 @@ The Kubernetes API server VIP floats across the 3 control plane VMs.
 
 ```bash
 # On master-1, master-2, master-3
-sudo apt install -y keepalived
+sudo dnf install -y keepalived
 
 # Configure keepalived — run on EACH master, changing PRIORITY and STATE
 # master-1: MASTER, priority 101

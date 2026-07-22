@@ -506,7 +506,7 @@ EOF
 sudo dnf install -y haproxy
 
 # Config is identical — same haproxy.cfg as Ubuntu version
-# (See 07-Kubernetes-vSphere.md section 2 for haproxy.cfg content)
+# (See 10-Kubernetes-vSphere.md section 2 for haproxy.cfg content)
 
 # Enable firewalld for VRRP multicast
 sudo firewall-cmd --permanent --add-rich-rule='rule protocol value="vrrp" accept'

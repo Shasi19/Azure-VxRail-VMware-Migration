@@ -151,7 +151,7 @@ PG_LAG=$(psql -h 10.0.5.15 -U postgres -t -c \
 echo "  pglogical lag: ${PG_LAG} ms"
 [ "${PG_LAG:-999999}" -lt 2000 ] || { echo "ABORT: pglogical lag too high (${PG_LAG} ms)"; exit 1; }
 
-MONGO_LAG=$(ssh ubuntu@10.0.5.25 "
+MONGO_LAG=$(ssh oracle@10.0.5.25 "
   mongosh --quiet --eval \"
     var s = rs.status()
     var primary = s.members.filter(m => m.stateStr == 'PRIMARY')[0]

@@ -358,7 +358,7 @@ spec:
   interfaces: [ens192]
 EOF
 
-# Storage Classes (after vSphere CSI installed — see 04-Storage-vSAN.md)
+# Storage Classes (after vSphere CSI installed — see 09-Storage-vSAN.md)
 kubectl apply -f storageclass-vsan.yaml
 
 # Verify

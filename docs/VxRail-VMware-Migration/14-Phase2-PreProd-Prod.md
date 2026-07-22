@@ -120,7 +120,7 @@ JOIN_CMD=$(kubeadm token create --print-join-command)
 
 # Join workers 3-6
 for WORKER_IP in 10.0.4.23 10.0.4.24 10.0.4.25 10.0.4.26; do
-  ssh ubuntu@"$WORKER_IP" "sudo ${JOIN_CMD}"
+  ssh oracle@"$WORKER_IP" "sudo ${JOIN_CMD}"
 done
 
 # Label workers for PreProd and Prod
@@ -147,7 +147,7 @@ kubectl get nodes --show-labels | grep -E 'worker-[3-6]'
 # On BOTH db-preprod-01 and db-preprod-02
 
 # Install PostgreSQL 15, etcd, Patroni
-sudo apt install -y postgresql-15 python3-pip python3-psycopg2
+sudo dnf install -y postgresql15 postgresql15-server python3-pip python3-psycopg2
 sudo pip3 install patroni[etcd] python-etcd
 
 # Install etcd on monitoring-01 (or a dedicated etcd VM)
@@ -290,7 +290,7 @@ pg_dump \
 
 scp /tmp/preprod_db_*.dump ubuntu@10.0.5.13:/tmp/
 
-ssh ubuntu@10.0.5.13 "
+ssh oracle@10.0.5.13 "
   pg_restore --host=localhost --username=postgres --dbname=preprod_db \
     --format=custom --no-owner /tmp/preprod_db_*.dump
 "
@@ -303,7 +303,7 @@ mongodump \
 
 scp -r /tmp/cosmos-preprod-dump ubuntu@10.0.5.23:/tmp/
 
-ssh ubuntu@10.0.5.23 "
+ssh oracle@10.0.5.23 "
   mongorestore \
     --uri='mongodb://admin:MongoAdmin2026!@localhost:27017/admin' \
     --drop --dir=/tmp/cosmos-preprod-dump
@@ -430,14 +430,14 @@ mongodump \
 
 scp -r /tmp/cosmos-prod-dump ubuntu@10.0.5.25:/tmp/
 
-ssh ubuntu@10.0.5.25 "
+ssh oracle@10.0.5.25 "
   mongorestore \
     --uri='mongodb://admin:MongoAdmin2026!@localhost:27017/admin' \
     --drop --dir=/tmp/cosmos-prod-dump
 "
 
 # Monitor for oplog lag — should be < 1 second before cutover
-ssh ubuntu@10.0.5.25 "
+ssh oracle@10.0.5.25 "
   mongosh --eval \"
     var lag = rs.printSecondaryReplicationInfo()
     printjson(lag)
@@ -485,7 +485,7 @@ echo "    pglogical lag: ${LAG} bytes"
 [ "${LAG}" -le 1000 ] || { echo "ABORT: pglogical lag too high"; exit 1; }
 
 echo "[2] Checking MongoDB oplog lag..."
-ssh ubuntu@10.0.5.25 "
+ssh oracle@10.0.5.25 "
   mongosh --quiet --eval \"
     var status = rs.status()
     status.members.filter(m => m.stateStr == 'SECONDARY').forEach(m => {

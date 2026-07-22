@@ -63,18 +63,18 @@ Week 8  ─── Phase 1 sign-off → Azure Dev + QA decommission
 
 ```bash
 # From your jump host with govc configured
-bash docs/VxRail-VMware-Migration/02-VM-Provisioning-vSphere.md/create-k8s-vms.sh
+bash docs/VxRail-VMware-Migration/07-VM-Provisioning-vSphere.md/create-k8s-vms.sh
 # (Create only masters + worker-1, worker-2 for Phase 1)
 
 bash inject-and-boot-phase1.sh
-# (See 02-VM-Provisioning-vSphere.md for full script)
+# (See 07-VM-Provisioning-vSphere.md for full script)
 ```
 
 ### Step 1.2 — Configure DVS Port Groups
 
 ```bash
 # Create port groups on VxRail DVS (one-time setup)
-# See 03-Network-vSphere.md section 1.2
+# See 08-Network-vSphere.md section 1.2
 
 # Set Forged Transmits = Accept on PG-K8s-Nodes
 govc dvs.portgroup.change -dc="Datacenter" \
@@ -86,7 +86,7 @@ govc dvs.portgroup.change -dc="Datacenter" \
 
 ```bash
 # On master-1, master-2, master-3 — install prerequisites
-# (Full commands in 07-Kubernetes-vSphere.md)
+# (Full commands in 10-Kubernetes-vSphere.md)
 
 # Summary:
 # 1. Install containerd
@@ -110,7 +110,7 @@ kubectl get nodes -o wide
 ### Step 1.4 — Install vSphere CSI Driver
 
 ```bash
-# See 04-Storage-vSAN.md section 2
+# See 09-Storage-vSAN.md section 2
 # 1. Enable disk.EnableUUID on all VMs via govc
 # 2. Create vCenter CSI service account
 # 3. Create vsphere-config-secret in K8s
@@ -165,7 +165,7 @@ EOF
 
 ```bash
 # On harbor-01 VM (10.0.6.12)
-ssh ubuntu@10.0.6.12
+ssh oracle@10.0.6.12
 
 # Install Docker
 curl -fsSL https://get.docker.com | sh
@@ -266,10 +266,10 @@ kubectl get svc -n monitoring | grep grafana
 ### Step 3.1 — Set Up Dev PostgreSQL on db-dev-01
 
 ```bash
-ssh ubuntu@10.0.5.11
+ssh oracle@10.0.5.11
 
 # Install PostgreSQL 15
-sudo apt install -y postgresql-15 postgresql-client-15
+sudo dnf install -y postgresql15 postgresql15-server
 
 # Configure pg_hba.conf to allow K8s worker IPs
 sudo tee -a /etc/postgresql/15/main/pg_hba.conf << 'EOF'
@@ -314,7 +314,7 @@ pg_dump \
 scp /tmp/dev_db_export_*.dump ubuntu@10.0.5.11:/tmp/
 
 # Step 3: Import to on-prem PostgreSQL 15
-ssh ubuntu@10.0.5.11 "
+ssh oracle@10.0.5.11 "
   pg_restore \
     --host=localhost \
     --port=5432 \
@@ -332,20 +332,20 @@ psql "host=${AZURE_PG_HOST} user=${AZURE_PG_USER} password=${AZURE_PG_PASS} dbna
   -c "SELECT schemaname, tablename, n_live_tup FROM pg_stat_user_tables ORDER BY n_live_tup DESC LIMIT 20;"
 
 # On-prem
-ssh ubuntu@10.0.5.11 \
+ssh oracle@10.0.5.11 \
   "psql -U dev_user -d dev_db -c \"SELECT schemaname, tablename, n_live_tup FROM pg_stat_user_tables ORDER BY n_live_tup DESC LIMIT 20;\""
 ```
 
 ### Step 3.3 — Set Up Dev MongoDB on mongo-dev-01
 
 ```bash
-ssh ubuntu@10.0.5.21
+ssh oracle@10.0.5.21
 
 # Install MongoDB 7.0
 wget -qO - https://www.mongodb.org/static/pgp/server-7.0.asc | sudo apt-key add -
 echo "deb [ arch=amd64 ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" \
   | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
-sudo apt update && sudo apt install -y mongodb-org
+sudo dnf install -y mongodb-org
 
 # Configure MongoDB
 sudo tee /etc/mongod.conf << 'EOF'
@@ -397,7 +397,7 @@ mongodump \
 scp -r /tmp/cosmos-dev-dump ubuntu@10.0.5.21:/tmp/
 
 # Restore to on-prem MongoDB
-ssh ubuntu@10.0.5.21 "
+ssh oracle@10.0.5.21 "
   mongorestore \
     --uri='mongodb://dev_user:DevMongo2026!@localhost:27017/dev-cosmos?authSource=dev-cosmos' \
     --drop \
@@ -405,7 +405,7 @@ ssh ubuntu@10.0.5.21 "
 "
 
 # Verify document count
-ssh ubuntu@10.0.5.21 "mongosh --quiet --eval \"
+ssh oracle@10.0.5.21 "mongosh --quiet --eval \"
   db.getSiblingDB('dev-cosmos').getCollectionNames().forEach(c => {
     print(c + ': ' + db.getSiblingDB('dev-cosmos').getCollection(c).countDocuments())
   })

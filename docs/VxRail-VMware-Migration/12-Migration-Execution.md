@@ -8,7 +8,7 @@
 
 ```bash
 # Run this before EVERY migration session
-bash docs/VxRail-VMware-Migration/11-Initial-Setup-Before-Migration.md  # Section 15 readiness script
+bash docs/VxRail-VMware-Migration/04-Initial-Setup-Before-Migration.md  # Section 15 readiness script
 # Must show: ✅ READY TO START MIGRATION
 ```
 
@@ -24,7 +24,7 @@ bash docs/VxRail-VMware-Migration/11-Initial-Setup-Before-Migration.md  # Sectio
 ssh oracle@10.0.3.11
 
 # 1. Run node prep (swap off, modules, containerd, kubeadm)
-# (see 07-Kubernetes-vSphere.md section 1 for full script)
+# (see 10-Kubernetes-vSphere.md section 1 for full script)
 sudo bash /usr/local/bin/k8s-node-prep.sh
 
 # 2. Start keepalived + HAProxy
@@ -715,7 +715,7 @@ Follow same steps as Dev+QA but use PreProd VMs:
 - App MetalLB IP: 10.0.4.202
 - DNS: `preprod.company.com`
 
-Full detail in `06-Phase2-PreProd-Prod.md` sections 10-12.
+Full detail in `14-Phase2-PreProd-Prod.md` sections 10-12.
 
 ### D3. Production Migration (Weeks 14-15)
 
@@ -757,7 +757,7 @@ watch -n 300 "psql -h 10.0.5.15 -U postgres -c \
 #### D3.2 Maintenance Window Cutover (Week 15, Saturday 22:00)
 
 ```bash
-# Full script in 08-Cutover-Runbook.md — Part 3
+# Full script in 15-Cutover-Runbook.md — Part 3
 bash prod-maintenance-cutover.sh 2>&1 | tee /var/log/prod-cutover-$(date +%Y%m%d).log
 
 # After cutover, update DNS:

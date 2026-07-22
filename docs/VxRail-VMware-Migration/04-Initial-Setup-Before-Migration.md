@@ -16,7 +16,7 @@ Step 6  ─── DNS Server VM
 Step 7  ─── NTP Verification
 Step 8  ─── Internal CA (TLS Certificates)
 Step 9  ─── Azure Connectivity (VPN)
-Step 10 ─── VM Template (Ubuntu 22.04 cloud image)
+Step 10 ─── VM Template (Oracle Linux 9 cloud image)
 Step 11 ─── Create All Phase 1 VMs
 Step 12 ─── Install Tools on All VMs
 Step 13 ─── Backup Infrastructure
@@ -270,10 +270,10 @@ vCenter > New Virtual Machine
     NIC: PG-K8s-Nodes (VLAN 20) or PG-Management (VLAN 10)
 ```
 
-### 5.2 Install Ubuntu 22.04 LTS
+### 5.2 Install Oracle Linux 9 on Jump Host
 
 ```bash
-# Attach Ubuntu 22.04 ISO via vCenter (upload ISO to vsanDatastore first):
+# Attach Oracle Linux 9 ISO via vCenter (upload ISO to vsanDatastore first):
 govc datastore.upload -ds=vsanDatastore ubuntu-22.04.4-live-server-amd64.iso iso/ubuntu-22.04.iso
 
 # Set static IP after install: 10.0.1.50 (management VLAN)
@@ -285,11 +285,11 @@ govc datastore.upload -ds=vsanDatastore ubuntu-22.04.4-live-server-amd64.iso iso
 
 ```bash
 # SSH to jumphost-01
-ssh ubuntu@10.0.1.50
+ssh oracle@10.0.1.50
 
 # Run the full tools installation
 sudo apt update && sudo apt upgrade -y
-sudo apt install -y git curl wget vim htop unzip jq python3-pip \
+sudo dnf install -y git curl wget vim htop unzip jq python3-pip \
   net-tools nfs-common sshpass cloud-image-utils
 
 # govc
@@ -301,7 +301,9 @@ curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.29/deb/Release.key \
   | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
 echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.29/deb/ /' \
   | sudo tee /etc/apt/sources.list.d/kubernetes.list
-sudo apt update && sudo apt install -y kubectl
+# Install kubectl (OL9)
+curl -LO https://dl.k8s.io/release/v1.29.0/bin/linux/amd64/kubectl
+sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 
 # Helm
 curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
@@ -313,20 +315,31 @@ curl -sS https://webinstall.dev/k9s | bash
 curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
 
 # PostgreSQL client
-sudo apt install -y postgresql-client-15
+sudo dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-9-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+sudo dnf -qy module disable postgresql
+sudo dnf install -y postgresql15
 
 # MongoDB tools
 wget -qO - https://www.mongodb.org/static/pgp/server-7.0.asc | sudo apt-key add -
 echo "deb [ arch=amd64 ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" \
   | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
-sudo apt update && sudo apt install -y mongodb-mongosh mongodb-database-tools
+# MongoDB shell on OL9
+sudo tee /etc/yum.repos.d/mongodb-org-7.0.repo << 'REPO'
+[mongodb-org-7.0]
+name=MongoDB Repository
+baseurl=https://repo.mongodb.org/yum/redhat/9/mongodb-org/7.0/x86_64/
+gpgcheck=1
+enabled=1
+gpgkey=https://www.mongodb.org/static/pgp/server-7.0.asc
+REPO
+sudo dnf install -y mongodb-mongosh mongodb-database-tools
 
 # MinIO client
 sudo wget https://dl.min.io/client/mc/release/linux-amd64/mc -O /usr/local/bin/mc
 sudo chmod +x /usr/local/bin/mc
 
 # Ansible
-sudo apt install -y ansible
+sudo dnf install -y ansible
 
 # Velero
 VELERO_VERSION=v1.13.0
@@ -368,9 +381,9 @@ govc vm.change --vm="dns-01" --cpu=2 --memory=2048
 
 ```bash
 # On dns-01 VM (IP: 10.0.1.5)
-ssh ubuntu@10.0.1.5
+ssh oracle@10.0.1.5
 
-sudo apt update && sudo apt install -y bind9 bind9utils bind9-doc
+sudo dnf install -y bind bind-utils
 
 # Main config — forward zone
 sudo tee /etc/bind/named.conf.local << 'EOF'
@@ -468,7 +481,7 @@ All VMs need synchronized time. etcd and K8s will break if clocks drift > 2 seco
 
 ```bash
 # On each VM (configure via cloud-init for new VMs)
-sudo apt install -y chrony
+sudo dnf install -y chrony
 
 sudo tee /etc/chrony/chrony.conf << 'EOF'
 # Use your corporate NTP server or public pools
@@ -498,7 +511,7 @@ Using `step-ca` (Smallstep) — enterprise-grade internal CA, easy to operate.
 
 ```bash
 # On a small VM: ca-01 (2 vCPU, 4 GB RAM, 50 GB disk, IP: 10.0.1.6)
-ssh ubuntu@10.0.1.6
+ssh oracle@10.0.1.6
 
 # Install step CA and CLI
 wget https://dl.smallstep.com/gh-release/certificates/gh-release-header/v0.25.0/step-ca_0.25.0_amd64.deb
@@ -635,12 +648,12 @@ mongosh "mongodb://account:key@your-cosmos.mongo.cosmos.azure.com:10255/dev-cosm
 
 ---
 
-## Step 10: VM Template (Ubuntu 22.04)
+## Step 10: VM Template (Oracle Linux 9)
 
 All K8s and DB VMs will be cloned from this template.
 
 ```bash
-# Download Ubuntu 22.04 server ISO
+# Download Oracle Linux 9 ISO
 wget https://releases.ubuntu.com/22.04/ubuntu-22.04.4-live-server-amd64.iso
 
 # Upload to vSAN
@@ -651,7 +664,7 @@ govc datastore.upload -ds=vsanDatastore \
 govc vm.create \
   -c=2 -m=4096 -disk=30GB \
   -net="PG-K8s-Nodes" \
-  -g=ubuntu64Guest \
+  -g=oracleLinux9_64Guest \
   -on=false \
   ubuntu-22.04-base
 
@@ -670,11 +683,11 @@ echo "Complete Ubuntu install via vCenter console, then run post-install steps b
 
 ```bash
 # SSH to the base VM after Ubuntu install
-ssh ubuntu@10.0.1.100   # temporary IP during template setup
+ssh oracle@10.0.1.100   # temporary IP during template setup
 
 # Install VMware Tools and cloud-init
 sudo apt update && sudo apt upgrade -y
-sudo apt install -y open-vm-tools cloud-init cloud-utils
+sudo dnf install -y open-vm-tools cloud-init cloud-utils-growpart
 
 # Configure cloud-init datasources (VMware uses OVF or ConfigDrive)
 sudo tee /etc/cloud/cloud.cfg.d/99-vxrail.cfg << 'EOF'
@@ -682,7 +695,7 @@ datasource_list: ['OVF', 'ConfigDrive', 'None']
 EOF
 
 # Install baseline packages all VMs need
-sudo apt install -y \
+sudo dnf install -y \
   curl wget vim htop net-tools nfs-common \
   chrony ufw fail2ban \
   python3-pip socat conntrack
@@ -820,7 +833,7 @@ df -h /backup/nfs
 ### 13.2 Configure Velero (K8s backup — install AFTER K8s is up)
 
 ```bash
-# MinIO bucket for Velero (already created in 04-Storage-vSAN.md)
+# MinIO bucket for Velero (already created in 09-Storage-vSAN.md)
 mc alias set vxrail http://10.0.6.11:9000 minio-admin MinIO@VxRail2026!
 mc mb vxrail/velero-backup
 
