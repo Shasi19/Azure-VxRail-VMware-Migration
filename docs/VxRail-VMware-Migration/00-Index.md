@@ -35,75 +35,75 @@
 
 ```
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║                   VXRAIL MIGRATION — 32-WEEK MASTER FLOW                    ║
+║                   VXRAIL MIGRATION — 32-WEEK MASTER FLOW                     ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║                                                                              ║
-║  STAGE 0 — DISCOVERY AND PLANNING  (Weeks 1–4)                              ║
-║  ┌─────────────────────────────────────────────────────────────────────┐    ║
-║  │  Step 1. Read 01-Architecture-Overview.md                           │    ║
-║  │          Understand: Azure now, VxRail now, Target state            │    ║
-║  │  Step 2. Audit VxRail cluster  →  02-Current-Infra-Inventory.md    │    ║
-║  │  Step 3. Raise procurement     →  03-Procurement-Guide.md          │    ║
-║  │          ORDER SWITCH/NAS NOW (8-week hardware lead time)           │    ║
-║  │  Step 4. Get approvals: Change Request for migration project        │    ║
-║  └─────────────────────────────────────────────────────────────────────┘    ║
+║  STAGE 0 — DISCOVERY AND PLANNING  (Weeks 1–4)                               ║
+║  ┌─────────────────────────────────────────────────────────────────────┐     ║
+║  │  Step 1. Read 01-Architecture-Overview.md                           │     ║
+║  │          Understand: Azure now, VxRail now, Target state            │     ║
+║  │  Step 2. Audit VxRail cluster  →  02-Current-Infra-Inventory.md     │     ║
+║  │  Step 3. Raise procurement     →  03-Procurement-Guide.md           │     ║
+║  │          ORDER SWITCH/NAS NOW (8-week hardware lead time)           │     ║
+║  │  Step 4. Get approvals: Change Request for migration project        │     ║
+║  └─────────────────────────────────────────────────────────────────────┘     ║
 ║                                │                                             ║
 ║                                ▼                                             ║
-║  STAGE 1 — HARDWARE DELIVERY BUFFER  (Weeks 5–8)                           ║
-║  ┌─────────────────────────────────────────────────────────────────────┐    ║
-║  │  Step 5. Receive and rack new hardware (switch, NAS)                │    ║
-║  │  Step 6. Configure on-prem foundations → 04-Initial-Setup.md       │    ║
-║  │          DNS, NTP, internal CA, Azure VPN, jump host, Ansible       │    ║
-║  │  Step 7. vSphere resource assessment → 05-Infrastructure-Assessment │    ║
-║  └─────────────────────────────────────────────────────────────────────┘    ║
+║  STAGE 1 — HARDWARE DELIVERY BUFFER  (Weeks 5–8)                             ║
+║  ┌─────────────────────────────────────────────────────────────────────┐     ║
+║  │  Step 5. Receive and rack new hardware (switch, NAS)                │     ║
+║  │  Step 6. Configure on-prem foundations → 04-Initial-Setup.md        │     ║
+║  │          DNS, NTP, internal CA, Azure VPN, jump host, Ansible       │     ║
+║  │  Step 7. vSphere resource assessment → 05-Infrastructure-Assessment │     ║
+║  └─────────────────────────────────────────────────────────────────────┘     ║
 ║                                │                                             ║
 ║                                ▼                                             ║
-║  STAGE 2 — INFRASTRUCTURE BUILD  (Weeks 9–12)                               ║
-║  ┌─────────────────────────────────────────────────────────────────────┐    ║
-║  │  Step 8.  Create Oracle Linux 9 VM template → 06-Oracle-Linux-VMs  │    ║
-║  │  Step 9.  Clone all 27 VMs via govc → 07-VM-Provisioning-vSphere   │    ║
-║  │  Step 10. Configure DVS VLANs + firewalld → 08-Network-vSphere     │    ║
-║  │  Step 11. Set up vSAN CSI + StorageClasses → 09-Storage-vSAN       │    ║
-║  │  Step 12. Build K8s HA cluster (kubeadm) → 10-Kubernetes-vSphere   │    ║
-║  │  Step 13. Configure Veeam backup jobs → 11-Veeam-Backup            │    ║
-║  │  Step 14. Deploy Harbor, ArgoCD, Prometheus → 12-Migration-Execution│    ║
-║  │           *** Buffer Week 12: Fix any infra errors ***              │    ║
-║  └─────────────────────────────────────────────────────────────────────┘    ║
+║  STAGE 2 — INFRASTRUCTURE BUILD  (Weeks 9–12)                                ║
+║  ┌─────────────────────────────────────────────────────────────────────┐     ║
+║  │  Step 8.  Create Oracle Linux 9 VM template → 06-Oracle-Linux-VMs   │     ║
+║  │  Step 9.  Clone all 27 VMs via govc → 07-VM-Provisioning-vSphere    │     ║
+║  │  Step 10. Configure DVS VLANs + firewalld → 08-Network-vSphere      │     ║
+║  │  Step 11. Set up vSAN CSI + StorageClasses → 09-Storage-vSAN        │     ║
+║  │  Step 12. Build K8s HA cluster (kubeadm) → 10-Kubernetes-vSphere    │     ║
+║  │  Step 13. Configure Veeam backup jobs → 11-Veeam-Backup             │     ║
+║  │  Step 14. Deploy Harbor, ArgoCD, Prometheus → 12-Migration-Execution│     ║
+║  │           *** Buffer Week 12: Fix any infra errors ***              │     ║
+║  └─────────────────────────────────────────────────────────────────────┘     ║
 ║                                │                                             ║
 ║                                ▼                                             ║
-║  STAGE 3 — PHASE 1: DEV + QA MIGRATION  (Weeks 13–20)                      ║
-║  ┌─────────────────────────────────────────────────────────────────────┐    ║
-║  │  Step 15. Migrate Dev PostgreSQL (pg_dump + pg_restore)             │    ║
-║  │  Step 16. Migrate Dev MongoDB (mongodump + mongorestore)            │    ║
-║  │  Step 17. Deploy Dev app workloads to K8s                           │    ║
-║  │  Step 18. Dev validation + sign-off (2 weeks)                       │    ║
-║  │  Step 19. Repeat for QA environment                                 │    ║
-║  │  Step 20. Dev + QA DNS cutover → 15-Cutover-Runbook.md             │    ║
-║  │           *** Buffer Weeks 19–20: Rework + approvals ***           │    ║
-║  │           → Detailed: 13-Phase1-Dev-QA.md                          │    ║
-║  └─────────────────────────────────────────────────────────────────────┘    ║
+║  STAGE 3 — PHASE 1: DEV + QA MIGRATION  (Weeks 13–20)                        ║
+║  ┌─────────────────────────────────────────────────────────────────────┐     ║
+║  │  Step 15. Migrate Dev PostgreSQL (pg_dump + pg_restore)             │     ║
+║  │  Step 16. Migrate Dev MongoDB (mongodump + mongorestore)            │     ║
+║  │  Step 17. Deploy Dev app workloads to K8s                           │     ║
+║  │  Step 18. Dev validation + sign-off (2 weeks)                       │     ║
+║  │  Step 19. Repeat for QA environment                                 │     ║
+║  │  Step 20. Dev + QA DNS cutover → 15-Cutover-Runbook.md              │     ║
+║  │           *** Buffer Weeks 19–20: Rework + approvals ***            │     ║
+║  │           → Detailed: 13-Phase1-Dev-QA.md                           │     ║
+║  └─────────────────────────────────────────────────────────────────────┘     ║
 ║                                │                                             ║
 ║                                ▼                                             ║
-║  STAGE 4 — PHASE 2: PREPROD + PROD MIGRATION  (Weeks 21–30)                ║
-║  ┌─────────────────────────────────────────────────────────────────────┐    ║
-║  │  Step 21. Migrate PreProd (Patroni HA + MongoDB RS)                 │    ║
-║  │  Step 22. PreProd validation + approval gate (2 weeks)              │    ║
-║  │  Step 23. Start pglogical LIVE replication: Prod PostgreSQL         │    ║
-║  │  Step 24. Deploy Prod apps to K8s (parallel with Azure)             │    ║
-║  │  Step 25. Load test + performance validation on on-prem             │    ║
-║  │  Step 26. Maintenance window: Prod DNS cutover                      │    ║
-║  │           *** Buffer Weeks 29–30: Hypercare + Azure on standby ***  │    ║
-║  │           → Detailed: 14-Phase2-PreProd-Prod.md + 15-Cutover-Runbook│    ║
-║  └─────────────────────────────────────────────────────────────────────┘    ║
+║  STAGE 4 — PHASE 2: PREPROD + PROD MIGRATION  (Weeks 21–30)                  ║
+║  ┌─────────────────────────────────────────────────────────────────────┐     ║
+║  │  Step 21. Migrate PreProd (Patroni HA + MongoDB RS)                 │     ║
+║  │  Step 22. PreProd validation + approval gate (2 weeks)              │     ║
+║  │  Step 23. Start pglogical LIVE replication: Prod PostgreSQL         │     ║
+║  │  Step 24. Deploy Prod apps to K8s (parallel with Azure)             │     ║
+║  │  Step 25. Load test + performance validation on on-prem             │     ║
+║  │  Step 26. Maintenance window: Prod DNS cutover                      │     ║
+║  │           *** Buffer Weeks 29–30: Hypercare + Azure on standby ***  │     ║
+║  │           → Detailed: 14-Phase2-PreProd-Prod.md + 15-Cutover-Runbook│     ║
+║  └─────────────────────────────────────────────────────────────────────┘     ║
 ║                                │                                             ║
 ║                                ▼                                             ║
-║  STAGE 5 — STABILIZATION + AZURE DECOMMISSION  (Weeks 31–32)               ║
-║  ┌─────────────────────────────────────────────────────────────────────┐    ║
-║  │  Step 27. 72h monitoring — confirm all production traffic on-prem   │    ║
-║  │  Step 28. Azure resource decommission (staged, keep VPN last)       │    ║
-║  │  Step 29. Establish patch cycles → 16-Patching-Cycles.md           │    ║
-║  │  Step 30. Handover ops runbook to team                              │    ║
-║  └─────────────────────────────────────────────────────────────────────┘    ║
+║  STAGE 5 — STABILIZATION + AZURE DECOMMISSION  (Weeks 31–32)                 ║
+║  ┌─────────────────────────────────────────────────────────────────────┐     ║
+║  │  Step 27. 72h monitoring — confirm all production traffic on-prem   │     ║
+║  │  Step 28. Azure resource decommission (staged, keep VPN last)       │     ║
+║  │  Step 29. Establish patch cycles → 16-Patching-Cycles.md            │     ║
+║  │  Step 30. Handover ops runbook to team                              │     ║
+║  └─────────────────────────────────────────────────────────────────────┘     ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 ```
 
