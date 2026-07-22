@@ -2,143 +2,127 @@
 ## Dell VxRail HCI + VMware vSphere
 
 > **Your Infrastructure:** 6-node Dell VxRail HCI cluster running VMware vSphere  
-> **Migration:** Azure (AKS + Cosmos DB + ACR + PostgreSQL + Storage) → On-Premises Kubernetes on VxRail  
-> **VM OS:** Oracle Linux 9 | **Backup:** Veeam Backup and Replication | **Phase 1:** Dev + QA | **Phase 2:** PreProd + Prod
+> **Source:** Azure (AKS + Cosmos DB + ACR + PostgreSQL + Storage) — Dev / QA / PreProd / Prod  
+> **Target:** Kubernetes on Oracle Linux 9 VMs on VxRail + vSAN  
+> **Backup:** Veeam Backup and Replication (existing)  
+> **Timeline:** 32 weeks including procurement buffers and approval gates
 
 ---
 
-## Start Here → [VxRail Migration Guide](docs/VxRail-VMware-Migration/00-Index.md)
-
-Everything you need for this migration is inside `docs/VxRail-VMware-Migration/`.  
-Follow the numbered steps below **in order**.
-
----
-
-## Step-by-Step Migration Flow
+## Repository Structure
 
 ```
-BEFORE YOU START
-  Step 1 → Audit your current VxRail hardware           [09-Current-Infra-Inventory.md]
-  Step 2 → Identify what to procure (switches, VPN..)   [10-Procurement-Guide.md]
-  Step 3 → Set up foundations (DNS, NTP, CA, VPN)       [11-Initial-Setup-Before-Migration.md]
-
-INFRASTRUCTURE BUILD  
-  Step 4 → Assess vSphere resources and vSAN capacity    [01-Infrastructure-Assessment.md]
-  Step 5 → Create Oracle Linux 9 VM template + all VMs   [02-VM-Provisioning-vSphere.md]
-            ↳ Oracle Linux 9 reference guide              [13-Oracle-Linux-VMs.md]
-  Step 6 → Configure DVS networking, VLANs, firewalld    [03-Network-vSphere.md]
-  Step 7 → Configure vSAN storage + CSI driver           [04-Storage-vSAN.md]
-  Step 8 → Build HA Kubernetes cluster on vSphere        [07-Kubernetes-vSphere.md]
-
-PHASE 1 — DEV + QA (Weeks 1–8)
-  Step 9 → Execute Phase 1 migration                     [05-Phase1-Dev-QA.md]
-            ↳ Master execution reference                  [12-Migration-Execution.md]
-
-PHASE 2 — PREPROD + PROD (Weeks 9–18)
-  Step 10 → Execute Phase 2 migration                    [06-Phase2-PreProd-Prod.md]
-  Step 11 → DNS cutover + rollback runbook               [08-Cutover-Runbook.md]
-
-ONGOING OPERATIONS
-  Step 12 → Configure Veeam Backup for all VMs + K8s    [14-Veeam-Backup.md]
-  Step 13 → Follow patch cycles (monthly/quarterly)     [15-Patching-Cycles.md]
+Migration/
+│
+├── docs/
+│   │
+│   ├── VxRail-VMware-Migration/     ← YOUR PRIMARY MIGRATION GUIDE (18 files)
+│   │   ├── 00-Index.md              ← Start here — master flow and 32-week timeline
+│   │   ├── 01-Architecture-Overview.md
+│   │   ├── 02 through 17 ...
+│   │
+│   ├── Presentation/                ← HLD / LLD / Executive slides (4 files)
+│   │   ├── 00-Index.md
+│   │   ├── 01-Executive-Presentation.md
+│   │   ├── 02-HLD-High-Level-Design.md
+│   │   └── 03-LLD-Low-Level-Design.md
+│   │
+│   └── Reference/                   ← Optional reference guides (57 files)
+│       ├── 00-Reference-Index.md
+│       ├── KVM-OLVM-Guide/          ← KVM + OLVM deep dive (13 files)
+│       ├── OnPrem-KVM/              ← Migration guide for KVM infra (10 files)
+│       ├── OnPrem-BareMetal/        ← Migration guide for bare-metal (9 files)
+│       ├── Volume-1-Executive-Architecture/
+│       ├── Volume-2-Migration-Strategy/
+│       ├── Volume-3-Infrastructure-Setup/
+│       ├── Volume-4-Kubernetes-Platform/
+│       ├── Volume-5-Database-Migration/
+│       ├── Volume-6-Application-Migration/
+│       ├── Volume-7-Monitoring-Security/
+│       └── Volume-8-GoLive-Operations/
+│
+└── README.md                        ← This file
 ```
 
 ---
 
-## All VxRail Migration Files
+## Start Here
 
-| # | File | What It Covers | When to Read |
-|---|------|---------------|-------------|
-| 00 | [**Index and Overview**](docs/VxRail-VMware-Migration/00-Index.md) | VM allocation plan, architecture overview, Azure-to-OnPrem service mapping | Day 0 |
-| — | **── BEFORE YOU START ──** | | |
-| 09 | [**Current Infra Inventory**](docs/VxRail-VMware-Migration/09-Current-Infra-Inventory.md) | How to audit your VxRail cluster — model identification, hardware worksheet, audit scripts | Day 0 |
-| 10 | [**Procurement Guide**](docs/VxRail-VMware-Migration/10-Procurement-Guide.md) | What to buy — switches with prices, Azure VPN SKU, certs, licenses, backup NAS | Day 0 |
-| 11 | [**Initial Setup (Pre-Migration)**](docs/VxRail-VMware-Migration/11-Initial-Setup-Before-Migration.md) | 15-step foundation: DNS/BIND9, NTP, internal CA, Azure VPN, jump host, Ansible, readiness gate | Days 1–14 |
-| — | **── INFRASTRUCTURE BUILD ──** | | |
-| 01 | [Infrastructure Assessment](docs/VxRail-VMware-Migration/01-Infrastructure-Assessment.md) | vSphere CPU/RAM/vSAN audit, cluster readiness checklist, capacity planning | Pre-work |
-| 02 | [VM Provisioning (vSphere)](docs/VxRail-VMware-Migration/02-VM-Provisioning-vSphere.md) | govc CLI bulk VM creation, cloud-init for OL9, all 26 VMs scripted | Pre-work |
-| 13 | [**Oracle Linux 9 VM Guide**](docs/VxRail-VMware-Migration/13-Oracle-Linux-VMs.md) | OL9 template creation, dnf vs apt command reference, K8s on OL9, SELinux, firewalld, PostgreSQL/MongoDB on OL9, troubleshooting | Pre-work |
-| 03 | [Network (DVS + firewalld)](docs/VxRail-VMware-Migration/03-Network-vSphere.md) | DVS port groups, VLANs, MetalLB L2 mode, keepalived VIP, firewalld rules for K8s | Pre-work |
-| 04 | [Storage (vSAN + CSI)](docs/VxRail-VMware-Migration/04-Storage-vSAN.md) | vSAN storage policies, vSphere CSI driver, StorageClasses per env, MinIO on vSAN | Pre-work |
-| 07 | [Kubernetes on vSphere](docs/VxRail-VMware-Migration/07-Kubernetes-vSphere.md) | kubeadm HA 3-master cluster, vSphere CCM, Calico CNI v3.27, MetalLB, verification | Pre-work |
-| — | **── MIGRATION EXECUTION ──** | | |
-| 12 | [**Master Migration Execution**](docs/VxRail-VMware-Migration/12-Migration-Execution.md) | Full step-by-step: K8s build → Harbor → ArgoCD → PostgreSQL migration → MongoDB migration → app deploy → DNS cutover → Azure decommission | Both phases |
-| 05 | [Phase 1 — Dev + QA](docs/VxRail-VMware-Migration/05-Phase1-Dev-QA.md) | Week-by-week plan: infra → DB migration → app deploy → validation → sign-off. Go/no-go gates. | Phase 1 |
-| 06 | [Phase 2 — PreProd + Prod](docs/VxRail-VMware-Migration/06-Phase2-PreProd-Prod.md) | Live pglogical replication for Prod, maintenance window cutover, Azure decommission | Phase 2 |
-| 08 | [Cutover Runbook](docs/VxRail-VMware-Migration/08-Cutover-Runbook.md) | DNS cutover scripts, smoke tests, rollback triggers, 72h post-cutover monitoring | Both phases |
-| — | **── ONGOING OPERATIONS ──** | | |
-| 14 | [**Veeam Backup Guide**](docs/VxRail-VMware-Migration/14-Veeam-Backup.md) | Veeam B&R v12 on VxRail: VBR install, hotadd transport, VM backup jobs for all 26 VMs, pre/post-freeze for PostgreSQL+MongoDB, Veeam Agent on OL9, Kasten K10 for K8s, restore procedures | During setup |
-| 15 | [**Patching Cycles**](docs/VxRail-VMware-Migration/15-Patching-Cycles.md) | Full patch calendar: Monthly (OS security), Quarterly (OS+K8s+DB), Semi-annual (VxRail ESXi+vCenter), Annual (major upgrades); rolling drain/patch/uncordon scripts, rollback procedures | Ongoing |
+### → [VxRail Migration Master Index](docs/VxRail-VMware-Migration/00-Index.md)
 
 ---
 
-## Architecture at a Glance
+## VxRail Migration — All 18 Files in Order
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│              AZURE (Current)                                    │
-│  Dev VNet    QA VNet    PreProd VNet    Prod VNet               │
-│  AKS + CosmosDB + ACR + PostgreSQL + Storage (x4 envs)         │
-└────────────────────────┬────────────────────────────────────────┘
-                         │  Migration (Phase 1 → Phase 2)
-┌────────────────────────▼────────────────────────────────────────┐
-│         DELL VxRail HCI CLUSTER (6 Nodes — VMware vSphere)     │
-│                                                                 │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │                  VMware vSAN Datastore                  │   │
-│  │  (pooled NVMe from all 6 nodes — distributed storage)  │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│                                                                 │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐ │
-│  │  K8s Control │  │  K8s Workers  │  │   Database VMs       │ │
-│  │  Plane       │  │  Dev/QA/PProd │  │   PostgreSQL 15      │ │
-│  │  (3 masters) │  │  /Prod        │  │   MongoDB 7.0        │ │
-│  │  OL9 VMs     │  │  OL9 VMs      │  │   OL9 VMs            │ │
-│  └──────────────┘  └──────────────┘  └──────────────────────┘ │
-│                                                                 │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │  Service VMs: Harbor | MinIO | Prometheus+Grafana        │  │
-│  │              Veeam B&R Server (Windows)                  │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│                                                                 │
-│  vCenter + VxRail Manager + DVS Networking + vSphere HA+DRS   │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-| Azure Service | On-Prem Replacement | File |
-|--------------|---------------------|------|
-| AKS | Kubernetes (kubeadm) on Oracle Linux 9 VMs | `07-Kubernetes-vSphere.md` |
-| Azure Cosmos DB (MongoDB API) | MongoDB 7.0 ReplicaSet on OL9 VMs | `12-Migration-Execution.md` |
-| Azure Container Registry (ACR) | Harbor on vSAN-backed VM | `12-Migration-Execution.md` |
-| Azure PostgreSQL | PostgreSQL 15 on OL9 VMs | `12-Migration-Execution.md` |
-| Azure Storage Account | MinIO on vSAN | `04-Storage-vSAN.md` |
-| Azure VNet | VMware DVS Port Groups (VLANs) | `03-Network-vSphere.md` |
-| Azure Backup / Velero | Veeam Backup and Replication v12 | `14-Veeam-Backup.md` |
-| Azure Update Management | Patch cycles (dnf + kubeadm upgrade) | `15-Patching-Cycles.md` |
+| # | File | What It Covers | When |
+|---|------|---------------|------|
+| 00 | [Index + 32-Week Timeline](docs/VxRail-VMware-Migration/00-Index.md) | Master flow, VM allocation, IP plan, Azure mapping | Day 0 |
+| 01 | [**Architecture Overview**](docs/VxRail-VMware-Migration/01-Architecture-Overview.md) | **Current Azure** + **Current VxRail on-prem** + **Target architecture** + Procurement list + Why every tool is used | Day 0 — Read First |
+| 02 | [Current Infra Inventory](docs/VxRail-VMware-Migration/02-Current-Infra-Inventory.md) | Audit your VxRail cluster — model, resources, audit scripts | Week 1–2 |
+| 03 | [Procurement Guide](docs/VxRail-VMware-Migration/03-Procurement-Guide.md) | What to order — switch, NAS, VPN, licenses with prices + lead times | Week 1–3 |
+| 04 | [Initial Setup (Pre-Migration)](docs/VxRail-VMware-Migration/04-Initial-Setup-Before-Migration.md) | 15-step foundation — DNS, NTP, CA, VPN, jump host, Ansible | Weeks 5–8 |
+| 05 | [Infrastructure Assessment](docs/VxRail-VMware-Migration/05-Infrastructure-Assessment.md) | vSphere + vSAN capacity audit, readiness checklist | Week 8 |
+| 06 | [Oracle Linux 9 VMs](docs/VxRail-VMware-Migration/06-Oracle-Linux-VMs.md) | OL9 template, dnf commands, cloud-init, SELinux, firewalld | Weeks 9–10 |
+| 07 | [VM Provisioning (vSphere)](docs/VxRail-VMware-Migration/07-VM-Provisioning-vSphere.md) | Create all 27 VMs with govc, bulk clone script, DRS rules | Week 10 |
+| 08 | [Network (DVS + firewalld)](docs/VxRail-VMware-Migration/08-Network-vSphere.md) | DVS VLANs, MetalLB, keepalived VIP, firewalld rules | Weeks 10–11 |
+| 09 | [Storage (vSAN + CSI)](docs/VxRail-VMware-Migration/09-Storage-vSAN.md) | vSAN policies, vSphere CSI driver, StorageClasses, MinIO | Week 11 |
+| 10 | [Kubernetes on vSphere](docs/VxRail-VMware-Migration/10-Kubernetes-vSphere.md) | kubeadm 3-master HA, Calico CNI, MetalLB, vSphere CCM | Weeks 11–12 |
+| 11 | [Veeam Backup](docs/VxRail-VMware-Migration/11-Veeam-Backup.md) | Veeam B&R v12, VM jobs, Veeam Agent on OL9, Kasten K10, restore | Week 12 |
+| 12 | [**Migration Execution**](docs/VxRail-VMware-Migration/12-Migration-Execution.md) | **Master commands** — Harbor, ArgoCD, PostgreSQL, MongoDB, app deploy, cutover | Weeks 13–28 |
+| 13 | [Phase 1 — Dev + QA](docs/VxRail-VMware-Migration/13-Phase1-Dev-QA.md) | Week-by-week plan — DB migrate → app deploy → validate → sign-off | Weeks 13–22 |
+| 14 | [Phase 2 — PreProd + Prod](docs/VxRail-VMware-Migration/14-Phase2-PreProd-Prod.md) | Patroni HA, pglogical live replication, maintenance window cutover | Weeks 21–30 |
+| 15 | [Cutover Runbook](docs/VxRail-VMware-Migration/15-Cutover-Runbook.md) | DNS cutover scripts, smoke tests, rollback decision tree, 72h monitoring | Weeks 22 + 31 |
+| 16 | [Patching Cycles](docs/VxRail-VMware-Migration/16-Patching-Cycles.md) | Monthly / Quarterly / Semi-annual / Annual patch cycles | Ongoing |
+| 17 | [**Troubleshooting Errors**](docs/VxRail-VMware-Migration/17-Troubleshooting-Errors.md) | **Every likely error** at every stage — vSphere, K8s, DB, Veeam, DNS, VPN — with fixes | Reference |
 
 ---
 
-## Environment Summary
+## Presentation Docs (For Stakeholders)
 
-| Environment | K8s Workers | PostgreSQL | MongoDB | Phase |
-|-------------|------------|-----------|---------|-------|
-| Dev | worker-1, worker-2 | db-dev-01 (standalone) | mongo-dev-01 (standalone) | Phase 1 |
-| QA | worker-1, worker-2 | db-qa-01 (standalone) | mongo-qa-01 (standalone) | Phase 1 |
-| PreProd | worker-3, worker-4 | db-preprod-01/02 (Patroni) | mongo-preprod-01/02 (RS) | Phase 2 |
-| Prod | worker-5, worker-6 | db-prod-01/02/03 (Patroni HA) | mongo-prod-01/02/03 (RS) | Phase 2 |
+| File | Audience | Contents |
+|------|---------|---------|
+| [00 Index](docs/Presentation/00-Index.md) | All | Navigation |
+| [01 Executive Presentation](docs/Presentation/01-Executive-Presentation.md) | CTO / Board | Business case, ROI, timeline, risk summary |
+| [02 HLD — High Level Design](docs/Presentation/02-HLD-High-Level-Design.md) | Architects | Architecture, traffic flow, security, CI/CD |
+| [03 LLD — Low Level Design](docs/Presentation/03-LLD-Low-Level-Design.md) | Engineers | IP plan, hardware specs, K8s resources, DNS |
 
 ---
 
-## Other Reference Guides (Not Required for VxRail Migration)
+## Reference Guides (Optional)
 
-| Guide | Purpose |
+> Not needed for VxRail migration. Useful if you work with KVM, bare-metal, or need generic K8s / DB references.
+
+| Guide | Contents |
 |-------|---------|
-| [Presentation / HLD / LLD](docs/Presentation/) | Executive slides, high-level design, low-level design |
-| [KVM + OLVM Guide](docs/KVM-OLVM-Guide/) | Deep-dive: KVM hypervisor and OLVM manager (if moving to KVM in future) |
-| [OnPrem-KVM](docs/OnPrem-KVM/) | K8s migration guide for KVM-based infrastructure |
-| [OnPrem-BareMetal](docs/OnPrem-BareMetal/) | K8s migration guide for bare-metal servers |
-| [Volume 1–8](docs/Volume-1-Executive-Architecture/) | General Azure-to-OnPrem docs (not VxRail-specific) |
+| [Reference Index](docs/Reference/00-Reference-Index.md) | Overview of all reference guides |
+| [KVM-OLVM-Guide](docs/Reference/KVM-OLVM-Guide/00-Index.md) | KVM hypervisor + OLVM deep dive (13 files) |
+| [OnPrem-KVM](docs/Reference/OnPrem-KVM/00-Index.md) | Full migration guide for KVM-based infra |
+| [OnPrem-BareMetal](docs/Reference/OnPrem-BareMetal/00-Index.md) | Full migration guide for bare-metal servers |
+| [Volume 1 — Executive Architecture](docs/Reference/Volume-1-Executive-Architecture/) | Executive summary, Azure + on-prem architecture visuals |
+| [Volume 2 — Migration Strategy](docs/Reference/Volume-2-Migration-Strategy/) | Strategy, Gantt, risk register, multi-env plan |
+| [Volume 3 — Infrastructure Setup](docs/Reference/Volume-3-Infrastructure-Setup/) | Generic network + compute config |
+| [Volume 4 — Kubernetes Platform](docs/Reference/Volume-4-Kubernetes-Platform/) | K8s setup guide + detailed commands reference |
+| [Volume 5 — Database Migration](docs/Reference/Volume-5-Database-Migration/) | PostgreSQL HA + Patroni generic guide |
+| [Volume 6 — Application Migration](docs/Reference/Volume-6-Application-Migration/) | Containerization, Helm, ArgoCD, GitLab CI |
+| [Volume 7 — Monitoring and Security](docs/Reference/Volume-7-Monitoring-Security/) | Prometheus, Grafana, ELK, Vault, NetworkPolicy |
+| [Volume 8 — Go-Live and Operations](docs/Reference/Volume-8-GoLive-Operations/) | Go-live runbook, rollback plan, daily ops |
 
 ---
 
-**Classification:** Internal Use Only &nbsp;|&nbsp; **Last Updated:** July 2026 &nbsp;|&nbsp; **Infra:** Dell VxRail HCI + VMware vSphere
+## 32-Week Timeline Summary
+
+```
+Weeks  1– 4  │ Discovery + Procurement order placed     │ Hardware lead time starts
+Weeks  5– 8  │ Hardware delivery + Foundation setup     │ DNS, NTP, CA, VPN, Ansible
+Weeks  9–12  │ Infrastructure build                     │ OL9 VMs, K8s, Veeam, Harbor
+Week      13 │ Buffer — fix infra errors                │
+Weeks 13–22  │ Phase 1: Dev + QA migration              │ DB migrate → app → validate
+Week      22 │ Dev + QA DNS cutover                     │ PHASE 1 COMPLETE
+Weeks 23–27  │ Phase 2: PreProd migration               │ Patroni HA + validate
+Weeks 28–31  │ Phase 2: Prod migration + cutover        │ pglogical live replication
+Weeks 31–32  │ Hypercare + Azure decommission           │ PROJECT COMPLETE
+```
+
+---
+
+**Classification:** Internal Use Only &nbsp;|&nbsp; **Last Updated:** July 2026
