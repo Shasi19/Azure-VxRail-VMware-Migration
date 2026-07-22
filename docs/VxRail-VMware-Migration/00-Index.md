@@ -28,6 +28,7 @@
 | 15 | [**15-Cutover-Runbook.md**](15-Cutover-Runbook.md) | DNS cutover scripts, smoke tests, rollback decision tree, 72h post-cutover monitoring | Weeks 20 + 28 |
 | 16 | [**16-Patching-Cycles.md**](16-Patching-Cycles.md) | Monthly/Quarterly/Semi-annual/Annual patch cycles — OS, K8s, DB, VxRail, Veeam, Helm charts | Ongoing |
 | 17 | [**17-Troubleshooting-Errors.md**](17-Troubleshooting-Errors.md) | Error catalog — vSphere, K8s, PostgreSQL, MongoDB, Harbor, DNS, Veeam, VPN — every error with fix | Reference |
+| 18 | [**18-Visual-Setup-Guide.md**](18-Visual-Setup-Guide.md) | Screen-by-screen visual reference — VxRail Manager, vCenter, Anaconda installer, kubectl outputs, Harbor, ArgoCD, Grafana, Veeam UI | Reference |
 
 ---
 
