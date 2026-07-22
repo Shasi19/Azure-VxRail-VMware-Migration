@@ -116,13 +116,29 @@ Week 7-8: Dev+QA Validation            Week 16-17: Prod Go-Live + Stabilize
 
 ## Guide Contents
 
+### Before You Start (Read First)
+
+| File | Contents | When |
+|------|----------|------|
+| [09-Current-Infra-Inventory.md](09-Current-Infra-Inventory.md) | **What you have now** — audit VxRail cluster, collect hardware facts, VxRail model guide | Day 0 |
+| [10-Procurement-Guide.md](10-Procurement-Guide.md) | **What to buy** — switches, VPN, certs, licenses, backup storage with specs and prices | Day 0 |
+| [11-Initial-Setup-Before-Migration.md](11-Initial-Setup-Before-Migration.md) | **Set up on-prem first** — 15-step foundation: DNS, NTP, CA, VPN, templates, Ansible, monitoring | Days 1–14 |
+
+### Infrastructure Setup
+
 | File | Contents | Phase |
 |------|----------|-------|
-| [01-Infrastructure-Assessment.md](01-Infrastructure-Assessment.md) | VxRail resource audit, capacity planning, vSAN sizing | Pre-work |
+| [01-Infrastructure-Assessment.md](01-Infrastructure-Assessment.md) | vSphere resource audit, vSAN capacity planning, readiness checklist | Pre-work |
 | [02-VM-Provisioning-vSphere.md](02-VM-Provisioning-vSphere.md) | Create VMs via vCenter UI + govc CLI + cloud-init | Pre-work |
-| [03-Network-vSphere.md](03-Network-vSphere.md) | DVS port groups, VLANs, MetalLB, firewall | Pre-work |
-| [04-Storage-vSAN.md](04-Storage-vSAN.md) | vSAN policies, vSphere CSI, StorageClass, MinIO | Pre-work |
-| [05-Phase1-Dev-QA.md](05-Phase1-Dev-QA.md) | **Phase 1: Dev + QA migration, week-by-week** | Phase 1 |
-| [06-Phase2-PreProd-Prod.md](06-Phase2-PreProd-Prod.md) | **Phase 2: PreProd + Prod migration, go/no-go gates** | Phase 2 |
-| [07-Kubernetes-vSphere.md](07-Kubernetes-vSphere.md) | kubeadm HA on VMware, vSphere cloud provider, CSI | Both |
-| [08-Cutover-Runbook.md](08-Cutover-Runbook.md) | DNS cutover, rollback, validation checklists | Both |
+| [03-Network-vSphere.md](03-Network-vSphere.md) | DVS port groups, VLANs, MetalLB config, keepalived VIP, firewall | Pre-work |
+| [04-Storage-vSAN.md](04-Storage-vSAN.md) | vSAN storage policies, vSphere CSI driver, StorageClasses, MinIO | Pre-work |
+| [07-Kubernetes-vSphere.md](07-Kubernetes-vSphere.md) | kubeadm HA on VMware VMs, vSphere CCM, Calico CNI, MetalLB end-to-end | Pre-work |
+
+### Migration Execution
+
+| File | Contents | Phase |
+|------|----------|-------|
+| [12-Migration-Execution.md](12-Migration-Execution.md) | **Master execution guide** — K8s build, Harbor, ArgoCD, DB migrate, app deploy, DNS cutover | Both |
+| [05-Phase1-Dev-QA.md](05-Phase1-Dev-QA.md) | Phase 1: Dev + QA week-by-week plan with go/no-go gates | Phase 1 |
+| [06-Phase2-PreProd-Prod.md](06-Phase2-PreProd-Prod.md) | Phase 2: PreProd + Prod with live pglogical replication | Phase 2 |
+| [08-Cutover-Runbook.md](08-Cutover-Runbook.md) | DNS cutover scripts, rollback procedures, 72h post-cutover monitoring | Both |

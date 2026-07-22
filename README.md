@@ -109,13 +109,17 @@ Three complete deployment paths — choose based on your on-prem infrastructure:
 | # | File | Description |
 |---|------|-------------|
 | 00 | [Index](docs/VxRail-VMware-Migration/00-Index.md) | VxRail overview, VM allocation plan, phase timeline, Azure mapping |
+| 09 | [**Current Infra Inventory**](docs/VxRail-VMware-Migration/09-Current-Infra-Inventory.md) | **What you have now** — VxRail model guide, audit commands, hardware worksheet |
+| 10 | [**Procurement Guide**](docs/VxRail-VMware-Migration/10-Procurement-Guide.md) | **What to buy** — switches with specs/prices, VPN, certs, licenses, backup storage |
+| 11 | [**Initial Setup (Before Migration)**](docs/VxRail-VMware-Migration/11-Initial-Setup-Before-Migration.md) | **15-step foundation** — DNS, NTP, CA, Azure VPN, templates, Ansible, readiness gate |
 | 01 | [Infrastructure Assessment](docs/VxRail-VMware-Migration/01-Infrastructure-Assessment.md) | vSphere resource audit, vSAN capacity planning, readiness checklist |
 | 02 | [VM Provisioning (vSphere)](docs/VxRail-VMware-Migration/02-VM-Provisioning-vSphere.md) | govc CLI, cloud-init on VMware, bulk VM creation script, DRS rules |
 | 03 | [Network (vSphere DVS)](docs/VxRail-VMware-Migration/03-Network-vSphere.md) | DVS port groups, VLANs, MetalLB config, keepalived VIP, firewall |
 | 04 | [Storage (vSAN + CSI)](docs/VxRail-VMware-Migration/04-Storage-vSAN.md) | vSAN policies, vSphere CSI driver, StorageClasses, MinIO on vSAN |
+| 07 | [Kubernetes on vSphere](docs/VxRail-VMware-Migration/07-Kubernetes-vSphere.md) | kubeadm HA with vSphere CCM, Calico CNI, CSI, MetalLB end-to-end |
+| 12 | [**Migration Execution**](docs/VxRail-VMware-Migration/12-Migration-Execution.md) | **Master guide** — K8s build, Harbor, ArgoCD, DB migrate, app deploy, DNS cutover |
 | 05 | [Phase 1 — Dev + QA](docs/VxRail-VMware-Migration/05-Phase1-Dev-QA.md) | Week-by-week: infra → DB migration → app deploy → validation → sign-off |
 | 06 | [Phase 2 — PreProd + Prod](docs/VxRail-VMware-Migration/06-Phase2-PreProd-Prod.md) | Live pglogical replication → maintenance window cutover → decommission |
-| 07 | [Kubernetes on vSphere](docs/VxRail-VMware-Migration/07-Kubernetes-vSphere.md) | kubeadm HA with vSphere CCM, Calico CNI, CSI, MetalLB end-to-end |
 | 08 | [Cutover Runbook](docs/VxRail-VMware-Migration/08-Cutover-Runbook.md) | DNS cutover scripts, rollback procedures, 72h post-cutover monitoring |
 
 ### OnPrem-KVM (Kubernetes inside KVM Virtual Machines)
