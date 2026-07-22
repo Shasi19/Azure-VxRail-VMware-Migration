@@ -948,3 +948,352 @@ echo "  Results: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ] && echo "  ✅ READY TO START MIGRATION" || echo "  ❌ FIX FAILURES BEFORE PROCEEDING"
 echo "=========================================="
 ```
+
+---
+
+## Step 0: VxRail First-Run / Day-1 Deployment Wizard
+
+> If VxRail is already deployed and vCenter is running, skip to Step 1.
+> If this is a fresh VxRail cluster, follow these steps first.
+
+### 0.1 What the VxRail Deployment Wizard Does
+
+```
+VxRail Manager Deployment Wizard (run once, takes 45-90 minutes):
+  1. Discovers all 6 nodes via iDRAC/IPMI
+  2. Validates hardware health (BIOS, firmware, disk status)
+  3. Collects network config (management IPs, vSAN IPs, vMotion IPs)
+  4. Deploys vCenter Server Appliance (VCSA) on the first node
+  5. Configures ESXi networking (DVS, VMkernels for vSAN/vMotion)
+  6. Creates vSAN disk groups on all nodes
+  7. Configures vSphere HA and DRS
+  8. Applies firmware baseline
+```
+
+### 0.2 Pre-Wizard Network Planning
+
+Before starting the wizard, collect these IP addresses:
+
+| Component | IP Address | Subnet | Gateway | DNS |
+|-----------|-----------|--------|---------|-----|
+| VxRail Manager | 10.0.1.30 | /24 | 10.0.1.1 | 10.0.1.5 |
+| vCenter Server | 10.0.1.10 | /24 | 10.0.1.1 | 10.0.1.5 |
+| ESXi Host 1 (mgmt) | 10.0.1.21 | /24 | 10.0.1.1 | 10.0.1.5 |
+| ESXi Host 2 (mgmt) | 10.0.1.22 | /24 | 10.0.1.1 | 10.0.1.5 |
+| ESXi Host 3 (mgmt) | 10.0.1.23 | /24 | 10.0.1.1 | 10.0.1.5 |
+| ESXi Host 4 (mgmt) | 10.0.1.24 | /24 | 10.0.1.1 | 10.0.1.5 |
+| ESXi Host 5 (mgmt) | 10.0.1.25 | /24 | 10.0.1.1 | 10.0.1.5 |
+| ESXi Host 6 (mgmt) | 10.0.1.26 | /24 | 10.0.1.1 | 10.0.1.5 |
+| vSAN VMkernel (each host) | 10.0.80.21-26 | /24 | — | — |
+| vMotion VMkernel (each host) | 10.0.90.21-26 | /24 | — | — |
+| NTP Server | 10.0.1.5 (or public pool.ntp.org) | — | — | — |
+
+### 0.3 Wizard Walkthrough (Screen by Screen)
+
+```
+Screen 1 — Welcome
+  → Click "Deploy VxRail" (not "Reimage")
+
+Screen 2 — Network Configuration
+  Fill in:
+    Management network IP pool (e.g., 10.0.1.20 - 10.0.1.26 for 6 nodes)
+    Subnet mask: 255.255.255.0
+    Gateway: 10.0.1.1
+    DNS: 10.0.1.5
+    NTP: pool.ntp.org (or your internal NTP IP)
+
+Screen 3 — vCenter Deployment
+  Choose: "Embedded vCenter" (runs on VxRail cluster itself)
+  vCenter IP: 10.0.1.10
+  vCenter FQDN: vcenter.internal.company.com
+  SSO domain: vsphere.local
+  SSO password: ChooseStrongPassword123!  ← WRITE THIS DOWN
+  Administrator account: administrator@vsphere.local
+
+Screen 4 — vSAN Configuration
+  Disk group type: All-Flash (NVMe cache + SSD capacity)
+  Choose "Automated" — VxRail Manager picks which disks go to cache/capacity
+  Enable: Deduplication and Compression (for All-Flash)
+  Enable: Encryption at rest (optional, requires key management)
+
+Screen 5 — Advanced Settings
+  vSAN datastore name: vsanDatastore
+  Datacenter name: Datacenter
+  Cluster name: VxRail-Cluster
+
+Screen 6 — Review & Deploy
+  Verify all settings
+  Click "Finish"
+  → Wait 45-90 minutes for automated deployment
+  → Watch progress bar in VxRail Manager UI
+
+Screen 7 — Post-Deployment
+  VxRail Manager shows "Cluster Health: Healthy"
+  Log in to vCenter: https://10.0.1.10/ui
+```
+
+---
+
+## Setup Flow Diagram
+
+```mermaid
+flowchart TD
+    S0([VxRail Cluster Available]) --> S1[Step 1: Health Check\nvCenter + VxRail Manager]
+    S1 --> S2[Step 2: Physical Network\nConfigure switch VLANs]
+    S2 --> S3[Step 3: vCenter DVS\nCreate Port Groups per VLAN]
+    S3 --> S4[Step 4: vSAN\nStorage Policies]
+    S4 --> S5[Step 5: Jump Host VM\nManagement workstation]
+    S5 --> S6[Step 6: DNS Server VM\nBIND9 internal DNS]
+    S6 --> S7[Step 7: NTP Verification\nAll hosts synced]
+    S7 --> S8[Step 8: Internal CA\nstep-ca TLS certificates]
+    S8 --> S9[Step 9: Azure VPN\nSite-to-site for data transfer]
+    S9 --> S10[Step 10: OL9 VM Template\nBase OS template]
+    S10 --> S11[Step 11: Create Phase 1 VMs\nDev and QA VMs]
+    S11 --> S12[Step 12: Install Tools\nAll VMs configured]
+    S12 --> S13[Step 13: Backup Infra\nVeeam jobs running]
+    S13 --> S14[Step 14: Monitoring Baseline\nPrometheus scraping]
+    S14 --> S15{Readiness Gate\nAll checks pass?}
+    S15 -->|No| FIX[Fix issues]
+    FIX --> S15
+    S15 -->|Yes| DONE([Ready for Migration])
+```
+
+---
+
+## VLAN Reference Table
+
+| VLAN ID | Port Group Name | Subnet | Gateway | Purpose | VMs / Components |
+|---------|----------------|--------|---------|---------|-----------------|
+| 10 | PG-Management | 10.0.1.0/24 | 10.0.1.1 | ESXi mgmt, vCenter, VxRail Manager | ESXi hosts, vCenter, DNS, Jump Host, Veeam |
+| 20 | PG-K8s-Nodes | 10.0.3.0/24 (masters), 10.0.4.0/24 (workers) | 10.0.3.1 / 10.0.4.1 | Kubernetes cluster nodes | k8s-master-1/2/3, k8s-worker-1 through 6 |
+| 30 | PG-Databases | 10.0.5.0/24 | 10.0.5.1 | Database VMs — PostgreSQL + MongoDB | db-dev/qa/preprod/prod, mongo-dev/qa/preprod/prod |
+| 40 | PG-Services | 10.0.6.0/24 | 10.0.6.1 | Shared services | Harbor, MinIO, Monitoring (Prometheus/Grafana) |
+| 80 | vSAN (VMkernel) | 10.0.80.0/24 | — | vSAN storage traffic between hosts | ESXi VMkernel vmk1 (internal use only) |
+| 90 | vMotion (VMkernel) | 10.0.90.0/24 | — | VM live migration between hosts | ESXi VMkernel vmk2 (internal use only) |
+
+---
+
+## Step 6 (Expanded): DNS Server VM Setup
+
+### 6.1 Deploy DNS VM
+
+```bash
+# Clone from OL9 template (after template is created in Step 10)
+govc vm.clone \
+  -vm=ol9-base-template \
+  -on=false \
+  -net="PG-Management" \
+  dns-server-01
+
+# Set CPU/RAM
+govc vm.change -vm=dns-server-01 -c=2 -m=4096
+
+# Power on
+govc vm.power -on dns-server-01
+
+# SSH in
+ssh oracle@10.0.1.5
+```
+
+### 6.2 Install and Configure BIND9
+
+```bash
+# Install BIND
+sudo dnf install -y bind bind-utils
+
+# Main named.conf
+sudo tee /etc/named.conf << 'EOF'
+options {
+    listen-on port 53 { 127.0.0.1; 10.0.1.5; };
+    directory           "/var/named";
+    dump-file           "/var/named/data/cache_dump.db";
+    statistics-file     "/var/named/data/named_stats.txt";
+    memstatistics-file  "/var/named/data/named_mem_stats.txt";
+    recursion yes;
+    allow-query         { localhost; 10.0.0.0/8; };
+    allow-recursion     { localhost; 10.0.0.0/8; };
+    forwarders          { 8.8.8.8; 8.8.4.4; };  # Forward external names to Google DNS
+    dnssec-validation no;
+};
+
+zone "internal.company.com" IN {
+    type master;
+    file "internal.company.com.zone";
+    allow-update { none; };
+};
+
+zone "0.10.in-addr.arpa" IN {
+    type master;
+    file "10.0.reverse.zone";
+    allow-update { none; };
+};
+EOF
+
+# Forward zone file
+sudo tee /var/named/internal.company.com.zone << 'EOF'
+$TTL 86400
+@   IN SOA  dns-server-01.internal.company.com. admin.company.com. (
+            2026072201  ; Serial
+            3600        ; Refresh
+            900         ; Retry
+            604800      ; Expire
+            86400 )     ; Minimum TTL
+    IN NS   dns-server-01.internal.company.com.
+
+; Infrastructure
+dns-server-01    IN A  10.0.1.5
+vcenter          IN A  10.0.1.10
+jump-host        IN A  10.0.1.20
+vxrail-manager   IN A  10.0.1.30
+veeam            IN A  10.0.1.40
+
+; K8s Control Plane
+k8s-master-1     IN A  10.0.3.11
+k8s-master-2     IN A  10.0.3.12
+k8s-master-3     IN A  10.0.3.13
+k8s-api          IN A  10.0.3.100
+
+; K8s Workers
+k8s-worker-1     IN A  10.0.4.21
+k8s-worker-2     IN A  10.0.4.22
+k8s-worker-3     IN A  10.0.4.23
+k8s-worker-4     IN A  10.0.4.24
+k8s-worker-5     IN A  10.0.4.25
+k8s-worker-6     IN A  10.0.4.26
+
+; PostgreSQL
+db-dev-01        IN A  10.0.5.11
+db-qa-01         IN A  10.0.5.12
+db-preprod-01    IN A  10.0.5.13
+db-preprod-02    IN A  10.0.5.14
+db-prod-01       IN A  10.0.5.15
+db-prod-02       IN A  10.0.5.16
+db-prod-03       IN A  10.0.5.17
+
+; MongoDB
+mongo-dev-01     IN A  10.0.5.21
+mongo-qa-01      IN A  10.0.5.22
+mongo-preprod-01 IN A  10.0.5.23
+mongo-preprod-02 IN A  10.0.5.24
+mongo-prod-01    IN A  10.0.5.25
+mongo-prod-02    IN A  10.0.5.26
+mongo-prod-03    IN A  10.0.5.27
+
+; Shared Services
+minio            IN A  10.0.6.11
+harbor           IN A  10.0.6.12
+monitoring       IN A  10.0.6.13
+
+; App endpoints (MetalLB)
+app-dev          IN A  10.0.4.200
+app-qa           IN A  10.0.4.201
+app-preprod      IN A  10.0.4.202
+app-prod         IN A  10.0.4.210
+EOF
+
+# Start and enable BIND
+sudo systemctl enable --now named
+
+# Test DNS
+nslookup vcenter.internal.company.com 10.0.1.5
+nslookup k8s-api.internal.company.com 10.0.1.5
+
+# Update all hosts to use this DNS
+# Add to /etc/resolv.conf on all VMs:
+echo "nameserver 10.0.1.5" | sudo tee /etc/resolv.conf
+echo "search internal.company.com" | sudo tee -a /etc/resolv.conf
+```
+
+---
+
+## Step 8 (Expanded): Internal CA with step-ca
+
+```bash
+# On your Jump Host or a dedicated CA VM (OL9)
+# Install step CLI
+STEP_VERSION="0.25.0"
+wget https://dl.smallstep.com/gh-release/cli/gh-release-header/v${STEP_VERSION}/step_linux_${STEP_VERSION}_amd64.tar.gz
+tar -xzf step_linux_${STEP_VERSION}_amd64.tar.gz
+sudo mv step_${STEP_VERSION}/bin/step /usr/local/bin/
+sudo mv step_${STEP_VERSION}/bin/step-ca /usr/local/bin/
+
+# Initialize CA
+step ca init \
+  --name="CompanyInternalCA" \
+  --dns="ca.internal.company.com" \
+  --address=":443" \
+  --provisioner="admin@company.com"
+# → Creates ~/.step/certs/root_ca.crt and ~/.step/certs/intermediate_ca.crt
+
+# Start CA server
+step-ca ~/.step/config/ca.json &
+
+# Issue a wildcard certificate
+step ca certificate \
+  "*.internal.company.com" \
+  wildcard.crt \
+  wildcard.key \
+  --ca-url https://ca.internal.company.com \
+  --root ~/.step/certs/root_ca.crt
+
+# Create K8s secret with wildcard cert
+kubectl create secret tls wildcard-tls \
+  --cert=wildcard.crt \
+  --key=wildcard.key \
+  --namespace=kube-system
+
+# Distribute root CA to all VMs so curl/browsers trust it
+sudo cp ~/.step/certs/root_ca.crt /etc/pki/ca-trust/source/anchors/company-root-ca.crt
+sudo update-ca-trust extract
+```
+
+---
+
+## Step 15: Final Readiness Gate Checklist
+
+Before starting Phase 1 migration, ALL items below must be checked:
+
+```
+Infrastructure Foundation:
+  [ ] vCenter accessible at https://vcenter.internal.company.com
+  [ ] All 6 ESXi hosts connected in vCenter (no disconnected hosts)
+  [ ] vSAN health: no red/yellow warnings
+  [ ] DVS port groups created: PG-Management, PG-K8s-Nodes, PG-Databases, PG-Services
+  [ ] Physical switch VLANs trunked (verified by ping test across VLANs)
+
+VMs Running:
+  [ ] Jump host VM accessible via SSH
+  [ ] DNS server responding: nslookup vcenter.internal.company.com returns correct IP
+  [ ] NTP synced: chronyc tracking shows offset < 100ms on all VMs
+  [ ] Internal CA issuing certs: step ca health returns OK
+
+Kubernetes:
+  [ ] All 9 K8s VMs created (3 masters + 6 workers)
+  [ ] kubectl get nodes shows all nodes Ready
+  [ ] Calico pods running: kubectl get pods -n calico-system
+  [ ] MetalLB running: kubectl get pods -n metallb-system
+  [ ] Harbor accessible at https://harbor.internal.company.com
+  [ ] ArgoCD accessible at https://argocd.internal.company.com
+
+Databases:
+  [ ] All PostgreSQL VMs running, PostgreSQL service active
+  [ ] All MongoDB VMs running, replica sets configured
+  [ ] Test DB connection from jump host
+
+Backup:
+  [ ] Veeam jobs configured for all VMs
+  [ ] First backup run completed successfully
+  [ ] Test restore verified (restore 1 VM to isolated network)
+
+Azure Connectivity:
+  [ ] VPN tunnel established (ping Azure management IP from jump host)
+  [ ] Can reach Azure PostgreSQL from jump host (psql connection test)
+  [ ] Can pull images from Azure ACR (docker pull test)
+
+Monitoring:
+  [ ] Prometheus scraping all targets
+  [ ] Grafana dashboards loading
+  [ ] Alert manager configured for critical alerts
+  [ ] Baseline metrics recorded (CPU, memory, storage before migration)
+```
+

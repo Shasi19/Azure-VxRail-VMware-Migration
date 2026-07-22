@@ -338,3 +338,269 @@ govc cluster.csnap -dc="Datacenter" VxRail-Cluster
 | PV not detaching | Volume stuck in Terminating | Check if `open-vm-tools` is installed on node VM; restart `kubelet` on affected node |
 | StorageClass FTT mismatch | PVC uses wrong policy | Explicitly set `storageClassName` in PVC spec; don't rely on default class for databases |
 | vSAN out of space | PVC creation fails | Check vSAN capacity in vCenter; delete old snapshots; move to RAID-5 policy to save space |
+
+---
+
+## 7. vSAN Architecture Diagram
+
+```
+6-Node vSAN Cluster — All-Flash Configuration
+
+Node 1          Node 2          Node 3
++----------+   +----------+   +----------+
+| NVMe     |   | NVMe     |   | NVMe     |  ← Cache tier (write buffer)
+| 800GB    |   | 800GB    |   | 800GB    |
++----------+   +----------+   +----------+
+| SSD      |   | SSD      |   | SSD      |  ← Capacity tier (persistent)
+| 1.92TB x4|   | 1.92TB x4|   | 1.92TB x4|
++----------+   +----------+   +----------+
+     |               |               |
+     +-------+-------+-------+-------+
+                     |
+           vSAN Distributed Storage
+           (single namespace, all nodes)
+           Total raw: ~46TB
+           Usable (FTT=1): ~23TB
+
+Node 4          Node 5          Node 6
++----------+   +----------+   +----------+
+| NVMe     |   | NVMe     |   | NVMe     |
+| 800GB    |   | 800GB    |   | 800GB    |
++----------+   +----------+   +----------+
+| SSD      |   | SSD      |   | SSD      |
+| 1.92TB x4|   | 1.92TB x4|   | 1.92TB x4|
++----------+   +----------+   +----------+
+```
+
+---
+
+## 8. Storage Policy — When to Use What
+
+| Policy | FTT | Method | Overhead | Use For | Min Nodes |
+|--------|-----|--------|----------|---------|-----------|
+| `vsan-dev-qa` | 0 | None | 0% | Dev/QA non-critical data | 1 |
+| `vsan-production` | 1 | RAID-1 Mirror | 2x storage | PreProd, Prod workloads | 3 |
+| `vsan-databases` | 1 | RAID-5 Erasure | 1.33x storage | PostgreSQL, MongoDB data disks | 4 |
+
+```
+FTT explained:
+  FTT = 0: No fault tolerance. One disk failure = data loss. OK for Dev/QA only.
+  FTT = 1 RAID-1: 2 copies on different hosts. One host can fail. Recommended for Prod.
+  FTT = 1 RAID-5: Data + parity across 4 nodes. More efficient than RAID-1 for large data.
+                   Best for large DB disks where storage efficiency matters.
+```
+
+---
+
+## 9. Create Storage Policies via vCenter (Step-by-Step)
+
+```
+vCenter UI Path:
+  Home → Policies and Profiles → VM Storage Policies → Create
+
+Policy 1: vsan-dev-qa
+  Name: vsan-dev-qa
+  Description: Dev and QA — No fault tolerance, maximum performance
+  Rules:
+    → Add Rule: VSAN → Failures to tolerate: 0
+    → Add Rule: VSAN → Failure tolerance method: No data redundancy
+  Click Finish
+
+Policy 2: vsan-production
+  Name: vsan-production
+  Description: PreProd and Production — RAID-1 mirroring, tolerates 1 failure
+  Rules:
+    → Add Rule: VSAN → Failures to tolerate: 1
+    → Add Rule: VSAN → Failure tolerance method: RAID-1 (Mirroring)
+    → Add Rule: VSAN → Number of disk stripes per object: 2
+  Click Finish
+
+Policy 3: vsan-databases
+  Name: vsan-databases
+  Description: Database volumes — RAID-5 erasure, efficient for large data
+  Rules:
+    → Add Rule: VSAN → Failures to tolerate: 1
+    → Add Rule: VSAN → Failure tolerance method: RAID-5 (Erasure Coding)
+    → Add Rule: VSAN → Number of disk stripes per object: 4
+  Click Finish
+```
+
+---
+
+## 10. vSphere CSI Driver — Full Installation
+
+### 10.1 Prerequisites on All K8s VMs
+
+```bash
+# CRITICAL: disk.EnableUUID must be TRUE on every K8s VM
+# Check via govc (from jump host):
+for VM in k8s-master-1 k8s-master-2 k8s-master-3 \
+          k8s-worker-1 k8s-worker-2 k8s-worker-3 \
+          k8s-worker-4 k8s-worker-5 k8s-worker-6; do
+  echo -n "$VM: "
+  govc vm.info -e "$VM" | grep -i "disk.enable"
+done
+# All should show: disk.enableUUID = TRUE
+# If not: govc vm.change -vm=<name> -e "disk.enableUUID=TRUE"
+```
+
+### 10.2 Create vCenter Credentials Secret
+
+```bash
+# Create CSI config file
+cat > /tmp/csi-vsphere.conf << EOF
+[Global]
+cluster-id = "vxrail-k8s-cluster"
+
+[VirtualCenter "vcenter.internal.company.com"]
+insecure-flag = "false"
+user = "csi-user@vsphere.local"
+password = "CSIUserPassword123!"
+port = "443"
+datacenters = "Datacenter"
+EOF
+
+# Create K8s secret
+kubectl create secret generic vsphere-config-secret \
+  --from-file=csi-vsphere.conf=/tmp/csi-vsphere.conf \
+  --namespace=vmware-system-csi
+
+# Clean up local file
+rm /tmp/csi-vsphere.conf
+```
+
+### 10.3 Create a Dedicated vCenter User for CSI
+
+```
+In vCenter: Administration → Single Sign-On → Users and Groups → Add User
+  Username: csi-user
+  Password: CSIUserPassword123!
+  Domain: vsphere.local
+
+Grant permissions (via Global Permissions):
+  vCenter level: Read-only + specific privileges:
+    Datastore: Allocate space, Browse datastore, Low level file operations
+    Host: Local operations → Reconfigure VM
+    Virtual machine: Configuration → Add existing disk, Add or remove device
+    vSAN: Cluster → ShallowRekey
+```
+
+### 10.4 Install vSphere CSI Driver
+
+```bash
+# Apply CRDs and driver
+kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/vsphere-csi-driver/v3.3.0/manifests/vanilla/vsphere-7.0u3/deploy/vsphere-csi-crds.yaml
+
+kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/vsphere-csi-driver/v3.3.0/manifests/vanilla/vsphere-7.0u3/deploy/vsphere-csi-controller-deployment.yaml
+
+kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/vsphere-csi-driver/v3.3.0/manifests/vanilla/vsphere-7.0u3/deploy/vsphere-csi-node-ds.yaml
+
+# Verify pods are running
+kubectl get pods -n vmware-system-csi
+# Expected:
+# vsphere-csi-controller-xxxx   Running
+# vsphere-csi-node-xxxx         Running (one per K8s node)
+```
+
+### 10.5 Create StorageClass YAML
+
+```yaml
+# storage-classes.yaml
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: vsan-dev-qa
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: csi.vsphere.volume
+parameters:
+  storagepolicyname: "vsan-dev-qa"
+  datastoreurl: "ds:///vmfs/volumes/vsan:xxxxxxxx/"
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: vsan-production
+provisioner: csi.vsphere.volume
+parameters:
+  storagepolicyname: "vsan-production"
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: vsan-databases
+provisioner: csi.vsphere.volume
+parameters:
+  storagepolicyname: "vsan-databases"
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+```
+
+```bash
+kubectl apply -f storage-classes.yaml
+kubectl get storageclass
+```
+
+### 10.6 Test PVC Creation
+
+```yaml
+# test-pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: test-pvc
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: vsan-dev-qa
+  resources:
+    requests:
+      storage: 5Gi
+```
+
+```bash
+kubectl apply -f test-pvc.yaml
+kubectl get pvc test-pvc
+# STATUS should change from Pending → Bound within 30 seconds
+# If stuck Pending: check CSI controller logs
+kubectl logs -n vmware-system-csi -l app=vsphere-csi-controller -c vsphere-csi-controller
+
+# Clean up test
+kubectl delete pvc test-pvc
+```
+
+---
+
+## 11. vSAN Health Monitoring
+
+```bash
+# From vCenter UI:
+# Cluster → Monitor → vSAN → Health
+# Run health check and look for:
+#   Green: Cluster health, Disk balance, Network health
+#   Yellow warnings are normal (e.g., "vSAN Build Recommendation")
+#   Red alerts need immediate attention
+
+# Common vSAN health check via esxcli (on any ESXi host):
+ssh root@10.0.1.21
+esxcli vsan health cluster list
+esxcli vsan storage list   # Show all disk groups
+esxcli vsan debug object list   # Show all vSAN objects
+
+# From jump host via govc:
+govc datastore.info vsanDatastore
+# Shows: capacity, free space, type
+
+# Check vSAN resync (after a disk/host failure and replacement)
+govc cluster.usage -cluster=VxRail-Cluster
+```
+

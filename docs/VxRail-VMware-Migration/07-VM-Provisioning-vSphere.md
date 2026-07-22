@@ -430,3 +430,160 @@ done
 
 echo "All base snapshots created."
 ```
+
+---
+
+## Complete VM Sizing Table — All 27 VMs
+
+| VM Name | Role | vCPU | RAM (GB) | Disk (GB) | Network | IP | Storage Policy |
+|---------|------|------|----------|-----------|---------|-----|----------------|
+| **K8s Control Plane** | | | | | | | |
+| k8s-master-1 | K8s API/etcd/scheduler | 4 | 8 | 60 | PG-K8s-Nodes | 10.0.3.11 | vsan-production |
+| k8s-master-2 | K8s API/etcd/scheduler | 4 | 8 | 60 | PG-K8s-Nodes | 10.0.3.12 | vsan-production |
+| k8s-master-3 | K8s API/etcd/scheduler | 4 | 8 | 60 | PG-K8s-Nodes | 10.0.3.13 | vsan-production |
+| **K8s Workers** | | | | | | | |
+| k8s-worker-1 | Dev workloads | 8 | 16 | 100 | PG-K8s-Nodes | 10.0.4.21 | vsan-dev-qa |
+| k8s-worker-2 | QA workloads | 8 | 16 | 100 | PG-K8s-Nodes | 10.0.4.22 | vsan-dev-qa |
+| k8s-worker-3 | PreProd workloads | 8 | 32 | 100 | PG-K8s-Nodes | 10.0.4.23 | vsan-production |
+| k8s-worker-4 | PreProd workloads | 8 | 32 | 100 | PG-K8s-Nodes | 10.0.4.24 | vsan-production |
+| k8s-worker-5 | Prod workloads | 16 | 32 | 100 | PG-K8s-Nodes | 10.0.4.25 | vsan-production |
+| k8s-worker-6 | Prod workloads | 16 | 32 | 100 | PG-K8s-Nodes | 10.0.4.26 | vsan-production |
+| **PostgreSQL** | | | | | | | |
+| db-dev-01 | PostgreSQL 15 Dev | 2 | 8 | 100 | PG-Databases | 10.0.5.11 | vsan-dev-qa |
+| db-qa-01 | PostgreSQL 15 QA | 2 | 8 | 100 | PG-Databases | 10.0.5.12 | vsan-dev-qa |
+| db-preprod-01 | PostgreSQL 15 PreProd primary | 4 | 16 | 200 | PG-Databases | 10.0.5.13 | vsan-databases |
+| db-preprod-02 | PostgreSQL 15 PreProd replica | 4 | 16 | 200 | PG-Databases | 10.0.5.14 | vsan-databases |
+| db-prod-01 | PostgreSQL 15 Prod primary | 8 | 32 | 500 | PG-Databases | 10.0.5.15 | vsan-databases |
+| db-prod-02 | PostgreSQL 15 Prod replica 1 | 8 | 32 | 500 | PG-Databases | 10.0.5.16 | vsan-databases |
+| db-prod-03 | PostgreSQL 15 Prod replica 2 | 8 | 32 | 500 | PG-Databases | 10.0.5.17 | vsan-databases |
+| **MongoDB** | | | | | | | |
+| mongo-dev-01 | MongoDB 7 Dev | 2 | 8 | 100 | PG-Databases | 10.0.5.21 | vsan-dev-qa |
+| mongo-qa-01 | MongoDB 7 QA | 2 | 8 | 100 | PG-Databases | 10.0.5.22 | vsan-dev-qa |
+| mongo-preprod-01 | MongoDB 7 PreProd member | 4 | 16 | 200 | PG-Databases | 10.0.5.23 | vsan-databases |
+| mongo-preprod-02 | MongoDB 7 PreProd member | 4 | 16 | 200 | PG-Databases | 10.0.5.24 | vsan-databases |
+| mongo-prod-01 | MongoDB 7 Prod Primary | 8 | 32 | 500 | PG-Databases | 10.0.5.25 | vsan-databases |
+| mongo-prod-02 | MongoDB 7 Prod Secondary | 8 | 32 | 500 | PG-Databases | 10.0.5.26 | vsan-databases |
+| mongo-prod-03 | MongoDB 7 Prod Secondary | 8 | 32 | 500 | PG-Databases | 10.0.5.27 | vsan-databases |
+| **Shared Services** | | | | | | | |
+| minio-01 | MinIO S3 object storage | 4 | 16 | 200 | PG-Services | 10.0.6.11 | vsan-production |
+| harbor-01 | Harbor container registry | 4 | 16 | 200 | PG-Services | 10.0.6.12 | vsan-production |
+| monitoring-01 | Prometheus + Grafana | 4 | 8 | 100 | PG-Services | 10.0.6.13 | vsan-production |
+| **Infrastructure** | | | | | | | |
+| jump-host | Management workstation | 2 | 4 | 60 | PG-Management | 10.0.1.20 | vsan-production |
+
+**Total resource requirements:**
+- vCPU: ~174 vCPU across all 27 VMs
+- RAM: ~530 GB RAM across all 27 VMs
+- Storage: ~5.4 TB raw (policy-adjusted usable depends on FTT settings)
+
+---
+
+## VM Deployment Workflow
+
+```mermaid
+flowchart TD
+    A([OL9 Template Ready]) --> B[Clone VM from template\ngovc vm.clone]
+    B --> C[Set vCPU + RAM\ngovc vm.change]
+    C --> D[Extend disk if needed\ngovc vm.disk.change]
+    D --> E[Set disk.enableUUID=TRUE\nRequired for K8s CSI]
+    E --> F[Power on VM\ngovc vm.power -on]
+    F --> G[SSH in - set hostname\nhostnamectl set-hostname]
+    G --> H[Set static IP\nnmcli connection modify]
+    H --> I[Apply network config\nnmcli connection up ens192]
+    I --> J[Add to Ansible inventory]
+    J --> K[Run post-config playbook\nansible-playbook configure-vm.yml]
+    K --> L{VM role?}
+    L -->|K8s node| M[Run k8s-node-prep.sh]
+    L -->|DB VM| N[Install PostgreSQL or MongoDB]
+    L -->|Service VM| O[Install Harbor or MinIO etc.]
+    M --> P([VM Ready])
+    N --> P
+    O --> P
+```
+
+---
+
+## Anti-Affinity Rules (Spread VMs Across Hosts)
+
+```bash
+# Create DRS anti-affinity rule: K8s masters must be on different hosts
+govc cluster.rule.create \
+  -cluster=VxRail-Cluster \
+  -name="K8s-Masters-AntiAffinity" \
+  -vm-anti-affinity \
+  k8s-master-1 k8s-master-2 k8s-master-3
+
+# Anti-affinity for Prod DB primary and replicas
+govc cluster.rule.create \
+  -cluster=VxRail-Cluster \
+  -name="Prod-DB-AntiAffinity" \
+  -vm-anti-affinity \
+  db-prod-01 db-prod-02 db-prod-03
+
+# Anti-affinity for MongoDB Prod replicas
+govc cluster.rule.create \
+  -cluster=VxRail-Cluster \
+  -name="Prod-Mongo-AntiAffinity" \
+  -vm-anti-affinity \
+  mongo-prod-01 mongo-prod-02 mongo-prod-03
+
+# Verify rules
+govc cluster.rule.ls -cluster=VxRail-Cluster
+```
+
+---
+
+## vCenter VM Folder Structure
+
+```
+vCenter → Datacenter → VMs and Templates
+├── Infrastructure/
+│   ├── dns-server-01
+│   ├── jump-host
+│   └── monitoring-01
+├── Dev/
+│   ├── k8s-worker-1
+│   ├── db-dev-01
+│   └── mongo-dev-01
+├── QA/
+│   ├── k8s-worker-2
+│   ├── db-qa-01
+│   └── mongo-qa-01
+├── PreProd/
+│   ├── k8s-worker-3
+│   ├── k8s-worker-4
+│   ├── db-preprod-01
+│   ├── db-preprod-02
+│   ├── mongo-preprod-01
+│   └── mongo-preprod-02
+├── Prod/
+│   ├── k8s-worker-5
+│   ├── k8s-worker-6
+│   ├── db-prod-01
+│   ├── db-prod-02
+│   ├── db-prod-03
+│   ├── mongo-prod-01
+│   ├── mongo-prod-02
+│   └── mongo-prod-03
+├── K8s-ControlPlane/
+│   ├── k8s-master-1
+│   ├── k8s-master-2
+│   └── k8s-master-3
+└── SharedServices/
+    ├── minio-01
+    └── harbor-01
+```
+
+```bash
+# Create folders via govc
+for FOLDER in Infrastructure Dev QA PreProd Prod K8s-ControlPlane SharedServices; do
+  govc folder.create /Datacenter/vm/$FOLDER
+done
+
+# Move VMs to their folders
+govc vm.move -folder=/Datacenter/vm/K8s-ControlPlane k8s-master-1 k8s-master-2 k8s-master-3
+govc vm.move -folder=/Datacenter/vm/Dev k8s-worker-1 db-dev-01 mongo-dev-01
+govc vm.move -folder=/Datacenter/vm/QA k8s-worker-2 db-qa-01 mongo-qa-01
+# etc.
+```
+

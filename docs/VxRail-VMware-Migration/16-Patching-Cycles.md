@@ -783,3 +783,301 @@ done
 
 echo "=== Verification complete ==="
 ```
+
+---
+
+## Complete Patching Procedures
+
+### Oracle Linux 9 — Monthly Patch Procedure
+
+```bash
+#!/bin/bash
+# ol9-patch.sh — Monthly patch script for Oracle Linux 9 VMs
+# Run on each VM individually, or via Ansible (recommended)
+
+set -euo pipefail
+HOSTNAME=$(hostname)
+LOG="/var/log/patching/$(date +%Y%m%d)-${HOSTNAME}.log"
+mkdir -p /var/log/patching
+
+echo "$(date): === OL9 Patch Start on $HOSTNAME ===" | tee -a $LOG
+
+# 1. Check for available updates
+echo "$(date): Available updates:" | tee -a $LOG
+dnf check-update 2>&1 | tee -a $LOG || true  # returns exit code 100 if updates available — not an error
+
+# 2. Check if update includes kernel
+KERNEL_UPDATE=$(dnf check-update 2>&1 | grep '^kernel' || echo "none")
+echo "$(date): Kernel update: $KERNEL_UPDATE" | tee -a $LOG
+
+# 3. Create VM snapshot BEFORE patching (via govc from jump host)
+# (This should be done externally before running this script)
+
+# 4. Apply all patches
+echo "$(date): Applying patches..." | tee -a $LOG
+dnf update -y 2>&1 | tee -a $LOG
+
+# 5. Check if reboot required
+REBOOT_NEEDED=$(needs-restarting -r 2>&1 || echo "reboot required")
+echo "$(date): Reboot needed: $REBOOT_NEEDED" | tee -a $LOG
+
+# 6. For non-K8s VMs: reboot
+# For K8s nodes: drain first, reboot, uncordon (see K8s patch section)
+if [[ "$HOSTNAME" != k8s-* ]]; then
+  echo "$(date): Rebooting in 30 seconds..." | tee -a $LOG
+  sleep 30
+  reboot
+fi
+
+echo "$(date): Patch complete (reboot pending if K8s node)" | tee -a $LOG
+```
+
+### Ansible Playbook — Patch All Non-K8s VMs
+
+```yaml
+# patch-vms.yml
+- name: Patch Oracle Linux 9 VMs
+  hosts: db_vms:service_vms:infra_vms
+  become: yes
+  serial: 1   # One VM at a time — no parallel patching
+  tasks:
+    - name: Check for updates
+      command: dnf check-update
+      register: updates
+      failed_when: updates.rc not in [0, 100]
+      changed_when: updates.rc == 100
+
+    - name: Apply patches
+      dnf:
+        name: "*"
+        state: latest
+      register: patch_result
+
+    - name: Check if reboot needed
+      command: needs-restarting -r
+      register: reboot_check
+      failed_when: false
+      changed_when: false
+
+    - name: Reboot if required
+      reboot:
+        reboot_timeout: 300
+        post_reboot_delay: 30
+      when: reboot_check.rc == 1
+
+    - name: Verify VM is back
+      wait_for_connection:
+        timeout: 120
+
+    - name: Verify services running
+      service:
+        name: "{{ item }}"
+        state: started
+      loop:
+        - chronyd
+        - sshd
+        - vmtoolsd
+```
+
+---
+
+### Kubernetes Node Patching Procedure
+
+> **Rule:** Patch one node at a time. Never drain more than 1 worker per environment simultaneously.
+
+```bash
+#!/bin/bash
+# k8s-node-patch.sh — Patch a single K8s node safely
+# Usage: k8s-node-patch.sh <node-name>
+# Example: k8s-node-patch.sh k8s-worker-1
+
+NODE=${1:?"Usage: $0 <node-name>"}
+
+echo "=== K8s Node Patch: $NODE ==="
+
+# Step 1: Cordon (prevent new pods scheduling on this node)
+kubectl cordon $NODE
+echo "Node $NODE cordoned"
+
+# Step 2: Drain (evict all pods gracefully)
+kubectl drain $NODE \
+  --ignore-daemonsets \   # DaemonSet pods stay (node-exporter, calico, etc.)
+  --delete-emptydir-data \
+  --grace-period=60 \     # give pods 60 seconds to terminate gracefully
+  --timeout=300s
+echo "Node $NODE drained"
+
+# Wait for all pods to evict
+sleep 10
+REMAINING=$(kubectl get pods --all-namespaces --field-selector spec.nodeName=$NODE \
+  --no-headers | grep -v DaemonSet | wc -l)
+echo "Remaining pods on $NODE: $REMAINING"
+
+# Step 3: SSH to node and apply patches
+ssh oracle@$(kubectl get node $NODE -o jsonpath='{.status.addresses[?(@.type=="InternalIP")].address}') \
+  'sudo dnf update -y && sudo reboot'
+
+echo "Patching initiated, waiting for node to come back..."
+
+# Step 4: Wait for node to come back
+sleep 60
+kubectl wait --for=condition=Ready node/$NODE --timeout=300s
+echo "Node $NODE is Ready again"
+
+# Step 5: Verify node is healthy
+kubectl describe node $NODE | grep -E "Ready|DiskPressure|MemoryPressure|PIDPressure"
+
+# Step 6: Uncordon
+kubectl uncordon $NODE
+echo "Node $NODE uncordoned — ready to accept pods"
+
+# Step 7: Verify pods reschedule
+sleep 30
+kubectl get pods --all-namespaces -o wide | grep $NODE
+echo "=== Patch complete for $NODE ==="
+```
+
+---
+
+### Kubernetes Version Upgrade (Minor Version)
+
+> **Process:** Upgrade kubeadm → upgrade control plane → upgrade kubelet on each node
+> **Example:** Upgrading from K8s 1.29.x to 1.30.x
+
+```bash
+# === PHASE 1: Upgrade first control plane master ===
+# SSH to k8s-master-1
+
+# 1. Update kubeadm
+dnf update -y kubeadm --disableexcludes=kubernetes
+kubeadm version  # verify new version
+
+# 2. Check upgrade plan
+kubeadm upgrade plan
+# Shows: recommended upgrade path and any warnings
+
+# 3. Apply upgrade (this upgrades control plane components)
+kubeadm upgrade apply v1.30.0 --yes
+# Takes 5-10 minutes — upgrades API server, scheduler, controller manager
+
+# 4. Upgrade kubelet on master-1
+kubectl drain k8s-master-1 --ignore-daemonsets --delete-emptydir-data
+dnf update -y kubelet kubectl --disableexcludes=kubernetes
+systemctl daemon-reload
+systemctl restart kubelet
+kubectl uncordon k8s-master-1
+
+# 5. Verify master-1
+kubectl get nodes
+# k8s-master-1 should show new version
+
+# === PHASE 2: Upgrade remaining masters ===
+# SSH to k8s-master-2, then k8s-master-3:
+kubeadm upgrade node  # (not "apply" — only for first master)
+kubectl drain k8s-master-2 --ignore-daemonsets --delete-emptydir-data
+dnf update -y kubelet kubectl --disableexcludes=kubernetes
+systemctl daemon-reload && systemctl restart kubelet
+kubectl uncordon k8s-master-2
+# Repeat for master-3
+
+# === PHASE 3: Upgrade each worker (use k8s-node-patch.sh pattern) ===
+for WORKER in k8s-worker-1 k8s-worker-2 k8s-worker-3 k8s-worker-4 k8s-worker-5 k8s-worker-6; do
+  echo "Upgrading $WORKER..."
+  kubectl drain $WORKER --ignore-daemonsets --delete-emptydir-data --grace-period=60
+  
+  ssh oracle@$(kubectl get node $WORKER -o jsonpath='{.status.addresses[?(@.type=="InternalIP")].address}') \
+    'sudo kubeadm upgrade node && sudo dnf update -y kubelet kubectl --disableexcludes=kubernetes && sudo systemctl daemon-reload && sudo systemctl restart kubelet'
+  
+  kubectl wait --for=condition=Ready node/$WORKER --timeout=120s
+  kubectl uncordon $WORKER
+  echo "$WORKER upgraded"
+  sleep 30  # let pods reschedule before moving to next node
+done
+
+# Final verification
+kubectl get nodes
+# All nodes should show new version
+```
+
+---
+
+### VxRail / ESXi Patching
+
+> **NEVER patch ESXi hosts directly with esxcli or VMware Update Manager bypassing VxRail Manager.**  
+> **VxRail Manager must orchestrate all patches to maintain cluster integrity.**
+
+```
+VxRail Patching Process (Via VxRail Manager):
+
+1. Open VxRail Manager: https://vxrail-manager.internal.company.com
+   
+2. Navigate: Update → Check for Updates
+   → VxRail Manager connects to Dell's update catalog
+   → Shows available bundle: VxRail 8.x.x (includes ESXi, firmware, drivers)
+
+3. Review What's Included:
+   → ESXi patch level
+   → iDRAC firmware
+   → NIC/HBA driver updates
+   → vSAN health patches
+   → Review release notes for any breaking changes
+
+4. Schedule Update:
+   → Choose "Rolling Update" (one host at a time, VMs live migrate away first)
+   → Never choose "Parallel Update" in production
+   → Schedule: Saturday 01:00 IST
+   → Email notification: your-team@company.com
+
+5. VxRail Manager Update Process (per node, automated):
+   a. Move VMs off the host (vSphere vMotion)
+   b. Put host in maintenance mode
+   c. Apply ESXi patch + firmware update
+   d. Reboot host
+   e. Host rejoins cluster
+   f. vSAN resyncs any objects
+   g. Move to next host
+
+6. Verify After Update:
+   → All 6 nodes: Connected, Not in maintenance mode
+   → vSAN: Healthy, no resync in progress
+   → kubectl get nodes: All K8s nodes Ready
+```
+
+---
+
+### Patch Compliance Report
+
+```bash
+#!/bin/bash
+# patch-report.sh — Check patch level on all VMs
+
+REPORT_FILE=/tmp/patch-report-$(date +%Y%m%d).txt
+echo "Patch Compliance Report - $(date)" > $REPORT_FILE
+echo "==========================================" >> $REPORT_FILE
+
+# Get all VMs from Ansible inventory
+VMSLIST=(
+  dns-server-01 jump-host veeam-server-01
+  k8s-master-1 k8s-master-2 k8s-master-3
+  k8s-worker-1 k8s-worker-2 k8s-worker-3 k8s-worker-4 k8s-worker-5 k8s-worker-6
+  db-dev-01 db-qa-01 db-preprod-01 db-prod-01
+  mongo-dev-01 mongo-qa-01 mongo-preprod-01 mongo-prod-01
+  harbor-01 minio-01 monitoring-01
+)
+
+for VM in "${VMSLIST[@]}"; do
+  echo "" >> $REPORT_FILE
+  echo "VM: $VM" >> $REPORT_FILE
+  ssh oracle@$VM "
+    echo '  OS: ' \$(cat /etc/oracle-release)
+    echo '  Kernel: ' \$(uname -r)
+    echo '  Last dnf update: ' \$(rpm -qa --last 2>/dev/null | head -1)
+    echo '  Pending updates: ' \$(dnf check-update 2>/dev/null | tail -1)
+  " 2>/dev/null >> $REPORT_FILE || echo "  ERROR: Could not SSH to $VM" >> $REPORT_FILE
+done
+
+echo "" >> $REPORT_FILE
+echo "Report complete. See: $REPORT_FILE"
+cat $REPORT_FILE
+```
+

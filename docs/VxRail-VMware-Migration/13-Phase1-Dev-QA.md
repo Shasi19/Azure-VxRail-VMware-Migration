@@ -616,3 +616,145 @@ az postgres server delete --name pg-dev --resource-group rg-ae-prod-we-001 --yes
 # 3. Keep Azure PreProd and Prod running — Phase 2 handles those
 echo "Phase 1 complete. PreProd and Prod still running on Azure."
 ```
+
+---
+
+## Phase 1 Gantt Chart (8 Weeks)
+
+```mermaid
+gantt
+    title Phase 1 - Dev and QA Migration
+    dateFormat  YYYY-MM-DD
+    section Week 1-2 Prep
+    Final infra validation          :a1, 2024-01-01, 5d
+    Freeze Dev/QA Azure deployments :a2, after a1, 2d
+    Announce maintenance window     :a3, after a1, 1d
+    section Week 2-3 Images
+    Pull all images from ACR        :b1, 2024-01-08, 2d
+    Push images to Harbor           :b2, after b1, 1d
+    Verify Harbor image pulls       :b3, after b2, 1d
+    section Week 3-4 Databases
+    pg_dump Dev DB from Azure       :c1, 2024-01-15, 1d
+    Transfer and restore Dev PostgreSQL :c2, after c1, 1d
+    mongodump Dev from Cosmos DB    :c3, after c1, 1d
+    Restore Dev MongoDB             :c4, after c3, 1d
+    Verify DB data integrity        :c5, after c2, 2d
+    section Week 4-5 Dev Cutover
+    Deploy Dev apps via ArgoCD      :d1, 2024-01-22, 2d
+    Smoke test Dev environment      :d2, after d1, 2d
+    Reduce Dev DNS TTL to 60s       :d3, after d2, 1d
+    Dev DNS cutover                 :d4, after d3, 1d
+    Post-cutover Dev validation     :d5, after d4, 2d
+    section Week 5-6 QA
+    pg_dump QA DB from Azure        :e1, 2024-01-29, 1d
+    Transfer and restore QA DB      :e2, after e1, 1d
+    Restore QA MongoDB              :e3, after e1, 1d
+    Verify QA DB integrity          :e4, after e2, 2d
+    section Week 6-7 QA Cutover
+    Deploy QA apps via ArgoCD       :f1, 2024-02-05, 2d
+    QA team regression testing      :f2, after f1, 3d
+    QA DNS cutover                  :f3, after f2, 1d
+    Post-cutover QA validation      :f4, after f3, 2d
+    section Week 7-8 Cleanup
+    Decommission Dev Azure resources :g1, 2024-02-12, 2d
+    Decommission QA Azure resources  :g2, after g1, 2d
+    Phase 1 retrospective           :g3, after g2, 1d
+    Go/No-Go for Phase 2            :milestone, after g3, 0d
+```
+
+---
+
+## Week-by-Week Task Breakdown
+
+### Week 1: Preparation
+
+| Day | Task | Owner | Duration | Verification |
+|-----|------|-------|----------|-------------|
+| Mon | Final infrastructure validation — all VMs running, K8s healthy | Infra team | 4h | kubectl get nodes shows all Ready |
+| Mon | Backup confirmation — Veeam jobs ran successfully last night | Backup admin | 1h | Veeam console — all jobs green |
+| Tue | Announce: Dev/QA change freeze (no new Azure deployments) | Project manager | 30min | Email to Dev/QA teams |
+| Tue | Document current Azure resource inventory (VMs, IPs, configs) | Infra team | 4h | Spreadsheet completed |
+| Wed | Set up monitoring alerts for migration period | DevOps | 2h | Test alert fires correctly |
+| Wed | Prepare migration scripts — dry run in test | Infra team | 4h | Scripts run without errors on test data |
+| Thu | Team walkthrough of migration steps | All | 2h | All team members understand their tasks |
+| Fri | Confirm go/no-go with stakeholders | PM | 1h | Written approval from Dev/QA leads |
+
+### Week 2-3: Image Migration
+
+```bash
+# Day 1: Inventory all ACR images
+az acr repository list --name <your-acr> -o table
+az acr repository show-tags --name <your-acr> --repository <image> -o table
+
+# Day 2-3: Migrate images
+# (run migration script from migration execution guide)
+
+# Verify in Harbor:
+# Login to https://harbor.internal.company.com
+# Check: Projects → migration → repositories
+# Confirm all images are present with correct tags
+
+# Test pull from K8s cluster:
+kubectl run test-pull \
+  --image=harbor.internal.company.com/migration/<your-image>:latest \
+  --restart=Never \
+  -n dev
+kubectl describe pod test-pull -n dev
+# Should show: Successfully pulled image
+kubectl delete pod test-pull -n dev
+```
+
+---
+
+## Dev Environment Cutover Checklist
+
+Complete every item before executing DNS cutover:
+
+```
+PRE-CUTOVER (Day before cutover window):
+  [ ] DB dump completed and verified (row counts match)
+  [ ] Images available in Harbor (test docker pull from K8s)
+  [ ] App pods running and healthy: kubectl get pods -n dev
+  [ ] App health check endpoint responding: curl http://<MetalLB-IP>/health
+  [ ] DB connections working: app logs show no DB connection errors
+  [ ] Veeam backup of on-prem Dev VMs completed
+  [ ] Rollback tested: can revert DNS in < 5 minutes
+  [ ] Stakeholders notified of cutover time
+  [ ] On-call team confirmed available during cutover window
+
+CUTOVER EXECUTION (Maintenance window: e.g., Saturday 02:00-04:00):
+  [ ] 02:00 - Stop all write operations on Azure Dev app
+  [ ] 02:05 - Final pg_dump delta (any changes since initial dump)
+  [ ] 02:10 - Apply delta to on-prem PostgreSQL
+  [ ] 02:15 - Reduce Azure DNS TTL: set to 60 seconds
+  [ ] 02:20 - Verify all traffic still hitting Azure
+  [ ] 02:30 - Update DNS to point to on-prem MetalLB IP
+  [ ] 02:35 - Monitor traffic: should shift to on-prem within 1 min
+  [ ] 02:40 - Run smoke tests against on-prem Dev app
+  [ ] 03:00 - Confirm with Dev team: app working
+  [ ] 03:30 - Azure Dev resources kept running (standby for 1 week)
+
+POST-CUTOVER (1 week after):
+  [ ] No rollback triggered
+  [ ] Performance metrics stable (compare to Azure baseline)
+  [ ] All automated tests passing
+  [ ] Decommission Azure Dev: stop VMs → delete resources
+```
+
+---
+
+## Go/No-Go Criteria Before Phase 2
+
+All of these must be YES before starting PreProd/Prod migration:
+
+| Criteria | Target | Actual | Pass/Fail |
+|----------|--------|--------|-----------|
+| Dev uptime (1 week post-cutover) | > 99.5% | | |
+| QA uptime (1 week post-cutover) | > 99.5% | | |
+| No P1/P2 incidents in on-prem Dev or QA | 0 incidents | | |
+| Veeam backups running daily | 14/14 jobs succeeded | | |
+| K8s cluster health | 0 node failures | | |
+| DB replication/performance | < 10ms query time for common queries | | |
+| Team confidence level | Team votes Go | | |
+| Budget approved for Phase 2 | Finance approved | | |
+

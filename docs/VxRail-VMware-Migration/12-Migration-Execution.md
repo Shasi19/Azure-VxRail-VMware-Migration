@@ -827,3 +827,329 @@ echo "Final: Cancel Azure subscription if no other services remain"
 | Harbor push rejected | `docker login harbor.internal.company.com` | Check TLS cert trusted; check project exists |
 | ArgoCD sync failed | ArgoCD UI > App > Sync Status | Check Git credentials; check Helm values; check namespace |
 | vSAN space full | vCenter > vSAN > Capacity | Delete old snapshots; increase vSAN policy to RAID-5; add disks |
+
+---
+
+## Migration Sequence Diagram
+
+```mermaid
+sequenceDiagram
+    participant AZ as Azure
+    participant VPN as VPN Tunnel
+    participant JH as Jump Host
+    participant DB as On-Prem DB VMs
+    participant K8S as On-Prem K8s
+    participant DNS as Internal DNS
+
+    Note over AZ,DNS: Phase 1 - Dev + QA Migration
+
+    AZ->>JH: Step 1 - Pull container images from ACR
+    JH->>K8S: Step 2 - Push images to Harbor registry
+
+    AZ->>VPN: Step 3 - pg_dump from Azure PostgreSQL
+    VPN->>JH: Stream dump file
+    JH->>DB: Step 4 - pg_restore to on-prem PostgreSQL
+
+    AZ->>VPN: Step 5 - mongodump from Azure Cosmos DB
+    VPN->>JH: Stream dump archive
+    JH->>DB: Step 6 - mongorestore to on-prem MongoDB
+
+    JH->>K8S: Step 7 - Apply K8s manifests via ArgoCD
+    K8S->>DB: Step 8 - Apps connect to on-prem DBs
+
+    JH->>DNS: Step 9 - Reduce DNS TTL to 60 seconds
+
+    Note over K8S,DNS: Validation period - 30 minutes
+
+    JH->>DNS: Step 10 - Update DNS to on-prem IP
+    Note over AZ,DNS: Traffic now flows to on-prem
+    AZ->>AZ: Step 11 - Decommission Dev/QA Azure resources
+```
+
+---
+
+## PostgreSQL Migration — Complete Commands
+
+### Check Azure PostgreSQL Version
+
+```bash
+# From jump host — connect to Azure PostgreSQL
+psql -h <azure-pg-host>.postgres.database.azure.com \
+     -U adminuser@<server-name> \
+     -d postgres \
+     -c "SELECT version();"
+# Note the version — must match or be older than on-prem PostgreSQL 15
+```
+
+### Full Database Dump from Azure
+
+```bash
+# Set Azure credentials (one-time)
+export PGHOST=<your-server>.postgres.database.azure.com
+export PGUSER=adminuser@<your-server>
+export PGPASSWORD='AzureDBPassword'
+export PGDATABASE=appdb
+
+# List all databases to migrate
+psql -l
+
+# Dump ALL databases (parallel, compressed)
+DUMP_DIR=/data/pg-dumps/$(date +%Y%m%d)
+mkdir -p $DUMP_DIR
+
+for DB in appdb_dev appdb_qa; do
+  echo "Dumping $DB..."
+  pg_dump \
+    -h $PGHOST \
+    -U $PGUSER \
+    -d $DB \
+    -F directory \          # directory format (allows parallel restore)
+    -j 4 \                  # 4 parallel dump workers
+    --compress=9 \          # maximum compression
+    --no-owner \            # don't dump owner (will set on restore)
+    --no-privileges \       # don't dump GRANT/REVOKE
+    -v \                    # verbose
+    -f $DUMP_DIR/${DB}.dump
+  echo "Done: $DB → $DUMP_DIR/${DB}.dump"
+done
+
+# Verify dump is not empty
+du -sh $DUMP_DIR/
+ls -la $DUMP_DIR/
+```
+
+### Transfer Dump to On-Prem
+
+```bash
+# Transfer via VPN (from jump host to on-prem DB server)
+# Option A: rsync (shows progress, resumes if interrupted)
+rsync -avz --progress \
+  $DUMP_DIR/ \
+  oracle@10.0.5.11:/data/pg-restore/
+
+# Option B: scp
+scp -r $DUMP_DIR oracle@10.0.5.11:/data/pg-restore/
+
+# Verify transfer (compare checksums)
+local_md5=$(find $DUMP_DIR -type f | sort | xargs md5sum | md5sum)
+remote_md5=$(ssh oracle@10.0.5.11 "find /data/pg-restore -type f | sort | xargs md5sum | md5sum")
+echo "Local:  $local_md5"
+echo "Remote: $remote_md5"
+# Must match!
+```
+
+### Restore to On-Prem PostgreSQL
+
+```bash
+# On the on-prem DB VM (e.g., db-dev-01 at 10.0.5.11)
+ssh oracle@10.0.5.11
+
+# Create database
+sudo -u postgres psql -c "CREATE DATABASE appdb_dev ENCODING 'UTF8';"
+
+# Restore
+sudo -u postgres pg_restore \
+  -h localhost \
+  -U postgres \
+  -d appdb_dev \
+  -F directory \
+  -j 4 \           # parallel restore workers
+  --no-owner \
+  --no-privileges \
+  -v \
+  /data/pg-restore/appdb_dev.dump \
+  2>&1 | tee /tmp/pg-restore.log
+
+# Verify row counts match Azure
+sudo -u postgres psql -d appdb_dev << 'SQL'
+SELECT schemaname, tablename, n_live_tup
+FROM pg_stat_user_tables
+ORDER BY n_live_tup DESC
+LIMIT 20;
+SQL
+
+# Compare with Azure counts (run same query on Azure before dump)
+```
+
+---
+
+## MongoDB Migration — Complete Commands
+
+### Dump from Azure Cosmos DB (MongoDB API)
+
+```bash
+# Azure Cosmos DB MongoDB API connection string
+COSMOS_CONN="mongodb://<account>:<key>@<account>.mongo.cosmos.azure.com:10255/?ssl=true&replicaSet=globaldb"
+
+DUMP_DIR=/data/mongo-dumps/$(date +%Y%m%d)
+mkdir -p $DUMP_DIR
+
+# Dump with oplog for point-in-time consistency
+mongodump \
+  --uri "$COSMOS_CONN" \
+  --db appdb_dev \
+  --out $DUMP_DIR \
+  --oplog \
+  --gzip \
+  --numParallelCollections 4 \
+  --verbose
+
+# List what was dumped
+ls -la $DUMP_DIR/appdb_dev/
+# Shows: collection1.bson.gz, collection1.metadata.json.gz, etc.
+```
+
+### Restore to On-Prem MongoDB
+
+```bash
+# Transfer to on-prem MongoDB VM
+rsync -avz $DUMP_DIR/ oracle@10.0.5.21:/data/mongo-restore/
+
+# On mongo-dev-01 (10.0.5.21)
+ssh oracle@10.0.5.21
+
+mongorestore \
+  --host localhost:27017 \
+  --db appdb_dev \
+  --dir /data/mongo-restore/appdb_dev \
+  --oplogReplay \
+  --gzip \
+  --numParallelCollections 4 \
+  --verbose
+
+# Verify document counts
+mongosh --eval "
+  db = db.getSiblingDB('appdb_dev');
+  db.getCollectionNames().forEach(function(name) {
+    print(name + ': ' + db[name].countDocuments());
+  });
+"
+```
+
+---
+
+## Container Image Migration (ACR → Harbor)
+
+```bash
+# List all images in Azure ACR
+az acr repository list --name <your-acr-name> --output table
+
+# For each image, pull from ACR and push to Harbor
+ACR_NAME="<your-acr-name>"
+HARBOR_HOST="harbor.internal.company.com"
+HARBOR_PROJECT="migration"
+
+# Login to ACR
+az acr login --name $ACR_NAME
+
+# Login to Harbor
+docker login $HARBOR_HOST -u admin -p HarborAdmin2026!
+
+# Pull, retag, push
+IMAGES=$(az acr repository list --name $ACR_NAME -o tsv)
+for IMAGE in $IMAGES; do
+  TAGS=$(az acr repository show-tags --name $ACR_NAME --repository $IMAGE -o tsv)
+  for TAG in $TAGS; do
+    FULL_IMAGE="${ACR_NAME}.azurecr.io/${IMAGE}:${TAG}"
+    TARGET="${HARBOR_HOST}/${HARBOR_PROJECT}/${IMAGE}:${TAG}"
+    
+    echo "Migrating: $FULL_IMAGE → $TARGET"
+    docker pull $FULL_IMAGE
+    docker tag $FULL_IMAGE $TARGET
+    docker push $TARGET
+    docker rmi $FULL_IMAGE $TARGET  # clean up local disk
+  done
+done
+
+echo "All images migrated to Harbor"
+```
+
+---
+
+## Application Deployment via ArgoCD
+
+```yaml
+# Create ArgoCD Application manifests for each environment
+# argocd-app-dev.yaml
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app-dev
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/<your-org>/<your-repo>.git
+    targetRevision: dev
+    path: k8s/dev
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+```
+
+```bash
+# Apply all ArgoCD applications
+kubectl apply -f argocd-app-dev.yaml
+kubectl apply -f argocd-app-qa.yaml
+
+# Monitor sync status
+argocd app list
+argocd app sync app-dev
+argocd app wait app-dev --health
+
+# Verify pods are running
+kubectl get pods -n dev
+kubectl get pods -n qa
+```
+
+---
+
+## Rollback Procedure at Each Stage
+
+```mermaid
+flowchart TD
+    A([Migration Step Fails]) --> B{Which step\nfailed?}
+    B -->|Image push to Harbor| C[Keep using ACR\nUpdate imagePullSecret in K8s]
+    B -->|DB restore failed| D[Drop on-prem DB\nFix restore, retry]
+    B -->|App pods failing| E[kubectl rollout undo\nor ArgoCD rollback]
+    B -->|DNS cutover done| F[Revert DNS TTL\nPoint DNS back to Azure IP\nTest Azure app]
+    C --> G{Resolved?}
+    D --> G
+    E --> G
+    F --> G
+    G -->|Yes| H[Resume migration\nfrom failed step]
+    G -->|No| I[Escalate to team\nlog incident]
+```
+
+```bash
+# DNS rollback (fastest — < 5 minutes)
+# Repoint DNS back to Azure:
+nsupdate << 'EOF'
+server 10.0.1.5
+zone internal.company.com
+update delete app-dev A
+update add app-dev 60 A <AZURE_APP_DEV_IP>
+send
+EOF
+
+# Verify
+nslookup app-dev.internal.company.com 10.0.1.5
+
+# App rollback via ArgoCD
+argocd app rollback app-dev
+argocd app wait app-dev --health
+
+# Database rollback: Azure DB is still running (not deleted yet)
+# Just update app config to point back to Azure connection string
+kubectl set env deployment/app-api \
+  -n dev \
+  DATABASE_URL=postgresql://user:pass@<azure-host>:5432/appdb_dev
+```
+

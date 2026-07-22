@@ -569,3 +569,175 @@ az consumption usage list --start-date "2026-01-01" --end-date "$(date +%Y-%m-%d
   --output table > azure-final-costs.txt
 echo "Azure decommission complete. Migration to VxRail finished."
 ```
+
+---
+
+## Phase 2 Gantt Chart (10 Weeks)
+
+```mermaid
+gantt
+    title Phase 2 - PreProd and Production Migration
+    dateFormat  YYYY-MM-DD
+    section Week 1-2 Change Mgmt
+    Raise Change Request CR-001     :a1, 2024-03-01, 2d
+    CAB approval meeting            :a2, after a1, 3d
+    Approved change window allocated :milestone, after a2, 0d
+    section Week 2-3 PreProd
+    PreProd image migration         :b1, 2024-03-08, 2d
+    PreProd DB dump and restore     :b2, after b1, 2d
+    PreProd app deployment          :b3, after b2, 2d
+    PreProd smoke tests             :b4, after b3, 3d
+    section Week 4-5 PreProd Cutover
+    PreProd DNS TTL reduction       :c1, 2024-03-22, 1d
+    PreProd DNS cutover             :c2, after c1, 1d
+    PreProd validation - 1 week     :c3, after c2, 5d
+    section Week 5-7 Prod Prep
+    Prod DB schema verification     :d1, 2024-04-01, 2d
+    Prod image pull test            :d2, after d1, 1d
+    Prod K8s resource quotas set    :d3, after d2, 1d
+    Prod Veeam policy verified      :d4, after d3, 1d
+    DR test restore (Prod)          :d5, after d4, 2d
+    Final runbook walkthrough       :d6, after d5, 1d
+    section Week 7-8 Prod Cutover
+    Prod change window booking      :e1, 2024-04-15, 2d
+    Stakeholder comms               :e2, after e1, 1d
+    Prod DB dump and restore        :e3, after e2, 1d
+    Prod DNS TTL reduction          :e4, after e3, 1d
+    Prod DNS cutover                :e5, after e4, 1d
+    Post-cutover Prod validation    :e6, after e5, 1d
+    section Week 8-10 Cleanup
+    Prod hypercare period           :f1, 2024-04-22, 10d
+    Decommission PreProd Azure      :f2, after e6, 3d
+    Decommission Prod Azure         :f3, 2024-05-01, 3d
+    Cost confirmation - Azure bill  :f4, after f3, 2d
+    Final project retrospective     :milestone, after f4, 0d
+```
+
+---
+
+## Change Management: Raising a Change Request
+
+> **All production changes require a formal Change Request (CR) approved by the Change Advisory Board (CAB).**
+
+```
+Change Request Template:
+
+CR Number: CR-2024-MIGRATION-001
+Title: Migrate Production Application from Azure to On-Prem VxRail
+
+Change Type: Major (affects production services)
+Risk Level: High
+Impact: All users during DNS cutover window (estimated < 5 minutes)
+
+Requestor: <Your Name>
+Approvers: IT Manager, Infrastructure Lead, Application Owner
+
+Change Description:
+  Migrate production Kubernetes workloads, PostgreSQL databases,
+  and MongoDB databases from Azure to on-prem Dell VxRail cluster.
+  This is Phase 2 of the Azure-to-OnPrem migration project.
+
+Business Justification:
+  Reduce infrastructure costs from ~$95,000/year (Azure) to
+  ~$30,000/year (on-prem operations). Improve data sovereignty.
+  Achieve sub-5ms database latency vs 15-25ms over Azure VPN.
+
+Technical Steps:
+  See Phase2-PreProd-Prod migration runbook (attached)
+
+Maintenance Window:
+  Start: Saturday 2024-04-20 at 00:00 IST
+  End:   Saturday 2024-04-20 at 04:00 IST
+  Estimated impact: < 5 minutes during DNS cutover
+
+Rollback Plan:
+  See 15-Cutover-Runbook.md, Section: Rollback Procedure
+  Estimated rollback time: < 10 minutes
+
+Test Evidence:
+  - Phase 1 (Dev+QA) completed successfully, 99.9% uptime for 4 weeks
+  - Veeam backups verified: 28/28 backup jobs successful
+  - DR test restore completed: 45-minute full restore confirmed
+  - Load testing: on-prem Prod environment handles 1.5x peak load
+
+Sign-off Required:
+  [ ] IT Manager
+  [ ] Infrastructure Lead
+  [ ] Application Owner / Business Owner
+  [ ] CISO (if applicable - for security review)
+```
+
+---
+
+## Production Cutover Window — Who Needs to Be Present
+
+| Role | Person | Responsibility | Contact |
+|------|--------|---------------|---------|
+| Incident Commander | IT Manager | Decision authority for go/no-go, rollback | Mobile phone |
+| Infrastructure Lead | Infra Team Lead | Execute all infra steps | On-site |
+| DBA | Database Admin | DB migration, verify, rollback | On-site |
+| App Owner | Dev Lead | Verify app functionality post-cutover | On call |
+| Network Admin | Network Eng | DNS changes, firewall if needed | On call |
+| Veeam Admin | Backup Admin | Confirm backups before cutover | On call |
+| Monitoring | DevOps | Watch dashboards, escalate anomalies | Watching Grafana |
+
+---
+
+## Rollback Decision Criteria
+
+```mermaid
+flowchart TD
+    A([Production Cutover Executed]) --> B[Start monitoring\n30-minute window]
+    B --> C{Any P1 issue\ndetected?}
+    C -->|No - 30 minutes pass| D{Any P2 issue?}
+    D -->|No| E([Cutover Successful\nHypercare begins])
+    D -->|Yes| F[Attempt quick fix\n< 15 minutes]
+    F --> G{Fixed?}
+    G -->|Yes| E
+    G -->|No| H[ROLLBACK DECISION]
+    C -->|Yes - immediately| H
+    H --> I[Incident Commander\ngives rollback order]
+    I --> J[Revert DNS to Azure\n< 5 minutes]
+    J --> K[Verify traffic back on Azure]
+    K --> L[Post-incident review\nwithin 24 hours]
+    L --> M[Fix root cause]
+    M --> N[Rebook change window]
+```
+
+**P1 Definition:** App completely unavailable, data loss occurring, or > 5 min outage with no fix in sight  
+**P2 Definition:** Degraded performance, partial functionality, > 2 min intermittent issues
+
+---
+
+## Hypercare Period (2 Weeks Post-Prod Cutover)
+
+During hypercare, the team runs extended monitoring:
+
+```bash
+# Hypercare monitoring script — run every hour for 2 weeks
+#!/bin/bash
+LOG=/var/log/hypercare-$(date +%Y%m%d).log
+echo "$(date): === Hypercare Check ===" >> $LOG
+
+# K8s pod health
+FAILED=$(kubectl get pods --all-namespaces --field-selector=status.phase!=Running,status.phase!=Succeeded -o name 2>/dev/null | wc -l)
+echo "$(date): Failed/Pending pods: $FAILED" >> $LOG
+if [ $FAILED -gt 0 ]; then
+  echo "$(date): ALERT - Failed pods detected!" >> $LOG
+  kubectl get pods --all-namespaces --field-selector=status.phase!=Running,status.phase!=Succeeded >> $LOG
+fi
+
+# Database connectivity
+PGCONN=$(PGPASSWORD=pass psql -h 10.0.5.15 -U postgres -c "SELECT 1" -t 2>&1)
+echo "$(date): Prod PostgreSQL: $PGCONN" >> $LOG
+
+MONGOCONN=$(mongosh 10.0.5.25 --eval "db.adminCommand('ping')" --quiet 2>&1)
+echo "$(date): Prod MongoDB: $MONGOCONN" >> $LOG
+
+# vSAN health
+VSAN_WARN=$(ssh root@10.0.1.21 "esxcli vsan health cluster list 2>/dev/null | grep -c Warning" 2>/dev/null || echo "0")
+echo "$(date): vSAN warnings: $VSAN_WARN" >> $LOG
+
+echo "$(date): === Check Complete ===" >> $LOG
+```
+

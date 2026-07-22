@@ -992,3 +992,359 @@ P4 — LOW (Next sprint)
     1. Log in backlog
     2. Fix in next maintenance window
 ```
+
+---
+
+## Additional Error Scenarios
+
+---
+
+### vSAN Disk Failure
+
+**Error:** VxRail Manager shows disk in "Absent" or "Degraded" state. vSAN health warning: "Capacity disk group degraded."
+
+**Root Cause:** Physical SSD/NVMe failed on one of the 6 VxRail nodes.
+
+**Fix:**
+```bash
+# Step 1: Identify which disk failed
+# vCenter → Cluster → Monitor → vSAN → Physical disks
+# Look for disk with status: Degraded, Absent, or Error
+
+# Step 2: Check vSAN rebuild status (how much data is resyncing)
+ssh root@10.0.1.21
+esxcli vsan debug object list | grep -i degraded
+
+# Step 3: Open a Dell support case — VxRail disks are field-replaceable
+# Dell support: 1-800-xxx-xxxx, or create case at support.dell.com
+# Provide: Service Tag (from VxRail Manager → System → Support)
+
+# Step 4: Dell will dispatch engineer with replacement disk (NBD support)
+# Do NOT attempt to replace disk without Dell guidance
+
+# Step 5: After replacement, VxRail Manager handles disk group rebuild
+# Monitor rebuild: VxRail Manager → vSAN → Resyncing components
+# Rebuild time: ~1-4 hours per TB of data
+
+# Step 6: Verify healthy state
+esxcli vsan health cluster list | grep -v OK
+# Should show no errors
+```
+
+**Prevention:** Monitor vSAN health weekly. Set up alertmanager rule for vSAN degraded state.
+
+---
+
+### ESXi Host Failure (Hardware or Network)
+
+**Error:** vCenter shows ESXi host disconnected. VMs previously on that host show "Orphaned" or migrated.
+
+**Root Cause:** ESXi host hardware failure, network failure, or PSOD (Purple Screen of Death).
+
+**Fix:**
+```bash
+# Step 1: Check vSphere HA kicked in
+# vCenter → Cluster → Monitor → vSphere HA → HA Events
+# Should show: "VM <name> powered on via HA"
+
+# Step 2: Verify VMs are running on other hosts
+govc vm.info 'k8s-*' | grep -E "Name:|Host:"
+
+# Step 3: Check if K8s nodes were affected
+kubectl get nodes
+# Affected worker will show NotReady
+
+# Step 4: If K8s node NotReady > 5 minutes, drain it
+kubectl drain <failed-node> --ignore-daemonsets --force --grace-period=0
+
+# Step 5: Try to recover the ESXi host
+# Option A: If network issue — check switch port, reset switch port
+# Option B: If host crashed (PSOD) — review iDRAC logs via DRAC IP
+# Option C: Physical access — check power, server LEDs
+
+# Open Dell support case if hardware is suspected bad
+
+# Step 6: When host comes back, verify it rejoins cluster
+govc host.info '*' | grep -E "Name:|Connection|State"
+# All should show: Connection state: connected
+```
+
+**Prevention:** Maintain vSphere HA with 25% CPU/memory admission control. Monitor iDRAC alerts via email.
+
+---
+
+### vCenter Unreachable (Manage ESXi Directly)
+
+**Error:** `https://vcenter.internal.company.com/ui` not responding. VMs may still be running.
+
+**Fix:**
+```bash
+# VMs continue running even if vCenter is down — ESXi is self-sufficient
+
+# Step 1: Check if vCenter VM is just down (not hardware failure)
+# SSH to ESXi host directly (enable SSH in DCUI if needed)
+ssh root@10.0.1.21
+vim-cmd vmsvc/getallvms | grep vcenter
+vim-cmd vmsvc/power.getstate <vmid>  # check vCenter VM state
+vim-cmd vmsvc/power.on <vmid>        # power on if stopped
+
+# Step 2: If vCenter VM needs to be rebooted from ESXi:
+vim-cmd vmsvc/reset <vmid>
+
+# Step 3: If vCenter is corrupt, use embedded vCenter recovery
+# See VMware KB: https://kb.vmware.com/s/article/67686
+
+# Step 4: Manage K8s without vCenter (kubectl still works):
+kubectl get nodes  # K8s control plane is independent of vCenter
+kubectl get pods   # Apps continue running
+# Only new PVC provisioning (vSphere CSI) will fail until vCenter is back
+
+# Step 5: If urgent PVC provisioning needed, pre-provision manually
+vmkfstools -c 100g /vmfs/volumes/vsanDatastore/manual-disk.vmdk
+```
+
+**Prevention:** Monitor vCenter VM with separate Prometheus check. Keep vCenter Appliance on its own vSAN fault domain.
+
+---
+
+### K8s etcd Quorum Loss
+
+**Error:** `kubectl get nodes` hangs or returns: `error: the server is currently unable to handle the request`
+
+**Root Cause:** Majority of etcd members down. With 3 members, you can lose 1. If 2 are down, the cluster is read-only or completely unavailable.
+
+**Fix:**
+```bash
+# Step 1: Check etcd member health
+# SSH to k8s-master-1
+ETCDCTL_API=3 etcdctl \
+  --endpoints=https://10.0.3.11:2379,https://10.0.3.12:2379,https://10.0.3.13:2379 \
+  --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+  --cert=/etc/kubernetes/pki/etcd/peer.crt \
+  --key=/etc/kubernetes/pki/etcd/peer.key \
+  member list
+
+# Step 2: If only 1 master is down — just restart it
+# The other 2 etcd members maintain quorum
+
+# Step 3: If 2 masters are down — CRITICAL (quorum lost)
+# You must restore from etcd snapshot backup
+
+# Step 4: Restore from etcd snapshot
+# Find latest snapshot (should be taken by Velero or cron job)
+ls /var/lib/etcd/snapshots/
+
+ETCDCTL_API=3 etcdctl snapshot restore \
+  /var/lib/etcd/snapshots/etcd-snapshot-latest.db \
+  --data-dir=/var/lib/etcd-restored \
+  --initial-cluster=k8s-master-1=https://10.0.3.11:2380 \
+  --initial-cluster-token=k8s-etcd \
+  --initial-advertise-peer-urls=https://10.0.3.11:2380 \
+  --name=k8s-master-1
+
+# Stop etcd, swap data dir, restart
+mv /var/lib/etcd /var/lib/etcd-old
+mv /var/lib/etcd-restored /var/lib/etcd
+systemctl restart etcd
+
+# Step 5: Remove failed masters from cluster, re-add
+kubeadm reset on failed masters
+kubeadm join ... --control-plane  # rejoin
+```
+
+**Prevention:** Schedule etcd snapshot: `0 */6 * * * etcdctl snapshot save /var/lib/etcd/snapshots/etcd-$(date +%Y%m%d-%H%M).db`. Upload to MinIO.
+
+---
+
+### K8s Node NotReady
+
+**Error:** `kubectl get nodes` shows a node in `NotReady` state.
+
+**Fix:**
+```bash
+# Step 1: Get more info
+kubectl describe node <node-name>
+# Look for: "Conditions" section — which condition is False/Unknown?
+# Common causes: DiskPressure, MemoryPressure, NetworkPluginNotReady, PIDPressure
+
+# Step 2: Check kubelet on the node
+ssh oracle@<node-ip>
+sudo systemctl status kubelet
+sudo journalctl -u kubelet -n 50
+
+# Common error in journalctl:
+# "cni plugin not initialized" → Calico not running
+# "Failed to connect to apiserver" → network issue or VIP down
+# "disk usage is above threshold" → clean up disk
+
+# Fix: restart kubelet
+sudo systemctl restart kubelet
+sleep 10
+kubectl get nodes
+
+# If still NotReady — check containerd
+sudo systemctl status containerd
+sudo systemctl restart containerd
+
+# Disk cleanup if DiskPressure:
+sudo crictl images prune  # remove unused container images
+sudo journalctl --vacuum-size=500M  # clear old journal logs
+df -h  # verify disk freed
+```
+
+---
+
+### Pod Stuck in Pending State
+
+**Error:** `kubectl get pods -n prod` shows pod in `Pending` state for > 2 minutes.
+
+**Fix:**
+```bash
+# Step 1: Describe the pod to get the reason
+kubectl describe pod <pod-name> -n prod
+# Look for Events section at bottom
+
+# Common reasons and fixes:
+
+# Reason 1: "0/6 nodes are available: insufficient memory"
+# Fix: Check resource requests in pod spec — may be too high
+kubectl top nodes
+# If nodes are full: check if other namespaces are overconfigured
+kubectl get resourcequota -n prod
+# Scale down non-essential pods or add more worker capacity
+
+# Reason 2: "0/6 nodes available: node(s) had taint {environment: prod}, that the pod didn't tolerate"
+# Fix: Add toleration to pod spec:
+# tolerations:
+# - key: "environment"
+#   operator: "Equal"
+#   value: "prod"
+#   effect: "NoSchedule"
+
+# Reason 3: "PVC not bound: waiting for first consumer"
+kubectl get pvc -n prod
+# If PVC stuck in Pending:
+kubectl describe pvc <pvc-name> -n prod
+# Check: storageclass name correct? CSI driver running?
+kubectl get pods -n vmware-system-csi
+
+# Reason 4: "ImagePullBackOff" — can't pull from Harbor
+kubectl describe pod <pod-name> -n prod | grep "image:"
+# Test: docker pull harbor.internal.company.com/...
+# Fix: Check imagePullSecret is created:
+kubectl get secret -n prod | grep regcred
+```
+
+---
+
+### TLS Certificate Expired
+
+**Error:** `kubectl logs -n prod <ingress-pod>` shows SSL handshake failure. Browser shows cert expired.
+
+**Fix:**
+```bash
+# Step 1: Check cert expiry
+kubectl get secret wildcard-tls -n kube-system \
+  -o jsonpath='{.data.tls\.crt}' | base64 -d | \
+  openssl x509 -noout -dates
+# Shows: notBefore and notAfter dates
+
+# Step 2: If expired — renew via step-ca
+step ca certificate \
+  "*.internal.company.com" \
+  wildcard-new.crt \
+  wildcard-new.key \
+  --ca-url https://ca.internal.company.com \
+  --root ~/.step/certs/root_ca.crt \
+  --force
+
+# Step 3: Update K8s secret
+kubectl create secret tls wildcard-tls \
+  --cert=wildcard-new.crt \
+  --key=wildcard-new.key \
+  --namespace=kube-system \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+# Step 4: Restart ingress controller to pick up new cert
+kubectl rollout restart deployment/nginx-ingress-controller -n ingress-nginx
+kubectl rollout status deployment/nginx-ingress-controller -n ingress-nginx
+
+# Step 5: Verify
+openssl s_client -connect harbor.internal.company.com:443 </dev/null 2>&1 | \
+  openssl x509 -noout -dates
+```
+
+**Prevention:** Set up monitoring for cert expiry:
+```bash
+# Check cert expiry daily (add to crontab)
+0 9 * * * openssl s_client -connect harbor.internal.company.com:443 </dev/null 2>&1 | openssl x509 -noout -checkend 2592000 || echo "ALERT: harbor cert expires in <30 days"
+```
+
+---
+
+### MetalLB Not Assigning LoadBalancer IP
+
+**Error:** `kubectl get svc -n prod` shows `<pending>` under EXTERNAL-IP for a LoadBalancer service.
+
+**Fix:**
+```bash
+# Step 1: Check MetalLB pods
+kubectl get pods -n metallb-system
+# All should be Running
+
+# Step 2: Check MetalLB config
+kubectl get ipaddresspool -n metallb-system -o yaml
+# Verify the pool has IPs in range: 10.0.4.200-10.0.4.220
+
+# Step 3: Check if IP pool is exhausted
+kubectl get svc --all-namespaces --field-selector spec.type=LoadBalancer
+# Count assigned external IPs — if all 21 IPs (200-220) are used, pool is full
+# Fix: expand the pool range in metallb-config.yaml
+
+# Step 4: Check L2Advertisement
+kubectl get l2advertisement -n metallb-system
+
+# Step 5: Check DVS port group security
+# vCenter → PG-K8s-Nodes → Security
+# Verify: Forged Transmits = Accept, MAC Address Changes = Accept
+# If not: fix in vCenter and wait 2-3 minutes for MetalLB to retry
+
+# Step 6: Force MetalLB to reassign
+kubectl rollout restart deployment/controller -n metallb-system
+sleep 30
+kubectl get svc -n prod
+```
+
+---
+
+### vSphere CSI Volume Not Mounting (disk.EnableUUID)
+
+**Error:** Pod stuck in `ContainerCreating`. `kubectl describe pod` shows:
+`"failed to create volumeattachment: ... disk.EnableUUID is not set to TRUE"`
+
+**Fix:**
+```bash
+# This means the K8s node VM doesn't have disk.EnableUUID=TRUE in vSphere
+
+# Step 1: Find which node the pod is on
+kubectl describe pod <pod-name> -n prod | grep "Node:"
+
+# Step 2: Power off the node VM (drain first!)
+kubectl drain <node-name> --ignore-daemonsets
+govc vm.power -off <vm-name>
+
+# Step 3: Set disk.EnableUUID
+govc vm.change -vm=<vm-name> -e "disk.enableUUID=TRUE"
+
+# Step 4: Power on
+govc vm.power -on <vm-name>
+kubectl wait --for=condition=Ready node/<node-name> --timeout=120s
+kubectl uncordon <node-name>
+
+# Step 5: Verify
+govc vm.info -e <vm-name> | grep disk.enableUUID
+# Should show: disk.enableUUID = TRUE
+
+# Prevent in future: always set disk.enableUUID in bulk-clone script (already included)
+```
+

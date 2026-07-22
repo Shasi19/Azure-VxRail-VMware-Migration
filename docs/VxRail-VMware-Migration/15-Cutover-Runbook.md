@@ -311,3 +311,198 @@ echo "Nodes:";        kubectl get nodes --no-headers | awk "{print $2}" | sort |
 | P2 High | Error rate > 1% OR latency > 2x baseline | < 30 min | Investigate + notify stakeholders |
 | P3 Medium | Single pod failure, non-critical alerts | < 2 hours | Fix during business hours |
 | P4 Low | Slow query, monitoring gap | Next business day | Backlog |
+
+---
+
+## DNS Cutover — Step-by-Step Commands
+
+### 24 Hours Before Cutover: Reduce TTL
+
+```bash
+# Check current DNS TTL on Azure DNS
+# Azure Portal → DNS Zones → your zone → check TTL on relevant A records
+# OR via CLI:
+az network dns record-set list \
+  --resource-group <rg-name> \
+  --zone-name <your-zone> \
+  --query "[?type=='Microsoft.Network/dnszones/A'].{name:name, ttl:ttl, ip:aRecords[0].ipv4Address}" \
+  -o table
+
+# Reduce Azure DNS TTL to 60 seconds (24h before cutover)
+# This ensures that when you change the IP, propagation happens within 60 seconds
+az network dns record-set a update \
+  --resource-group <rg-name> \
+  --zone-name <your-zone> \
+  --name app-prod \
+  --set ttl=60
+
+# Confirm change
+az network dns record-set a show \
+  --resource-group <rg-name> \
+  --zone-name <your-zone> \
+  --name app-prod | grep ttl
+# Should show: "ttl": 60
+```
+
+### During Cutover Window: DNS Switch
+
+```bash
+# Step 1: Verify on-prem app is healthy before switching
+curl -sk https://10.0.4.210/health
+# Expected: {"status":"healthy","version":"1.0.x"}
+
+# Step 2: Note current Azure app IP (for rollback reference)
+AZURE_IP=$(az network dns record-set a show \
+  --resource-group <rg> --zone-name <zone> --name app-prod \
+  | jq -r '.aRecords[0].ipv4Address')
+echo "Azure IP: $AZURE_IP"  # Write this down
+
+# Step 3: Update DNS to on-prem IP
+ONPREM_IP="10.0.4.210"  # MetalLB LoadBalancer IP for Prod
+
+az network dns record-set a update \
+  --resource-group <rg> \
+  --zone-name <zone> \
+  --name app-prod \
+  --set "aRecords[0].ipv4Address=${ONPREM_IP}"
+
+# Step 4: Verify DNS change propagated
+# From multiple locations (jump host, laptop, mobile hotspot):
+nslookup app-prod.<your-zone> 8.8.8.8
+# Should return: $ONPREM_IP
+
+# Step 5: Monitor traffic shift
+# On on-prem K8s (watch incoming requests):
+kubectl logs -n prod -l app=nginx-ingress -f --tail=50
+
+# Step 6: Verify app responds
+curl -sk https://app-prod.<your-zone>/health
+# Should return on-prem response (check version or hostname in response)
+```
+
+### Traffic Verification
+
+```bash
+# Check that traffic is hitting on-prem, not Azure
+# Method 1: Check K8s ingress access logs
+kubectl logs -n prod deployment/nginx-ingress-controller \
+  --tail=100 | grep "GET /api"
+
+# Method 2: Watch Grafana dashboard
+# Panel: "HTTP Requests per minute" — should show increase on on-prem
+
+# Method 3: Azure side — verify traffic dropped to 0
+# Azure Portal → App Service / AKS → Metrics → HTTP requests
+# Should drop to 0 within 2-3 minutes of DNS change
+```
+
+### Azure Resource Shutdown Sequence
+
+```bash
+# Shut down Azure resources in this ORDER (never reverse order)
+# This prevents data loss and dependency issues
+
+# 1. Scale down Azure K8s (AKS) to 0 nodes (preserves config but stops compute cost)
+az aks scale --resource-group <rg> --name <aks-cluster> --node-count 0
+
+# 2. Stop Azure Database (PostgreSQL)
+# Flexible Server:
+az postgres flexible-server stop --resource-group <rg> --name <db-server>
+# Single Server (deprecated but some still have it):
+az postgres server restart --resource-group <rg> --name <server> # Stop instead
+
+# 3. Disable Cosmos DB (no "stop" available — reduce throughput to minimum)
+az cosmosdb sql throughput update \
+  --resource-group <rg> \
+  --account-name <cosmos-account> \
+  --database-name <db> \
+  --throughput 400   # minimum RU/s = minimum cost
+
+# 4. Stop Container Registry (ACR) - pause sync
+az acr update --name <acr-name> --admin-enabled false
+
+# WAIT 1 week before full deletion (rollback safety period)
+
+# After 1 week — permanent deletion:
+# az aks delete --resource-group <rg> --name <aks-cluster> --yes
+# az postgres flexible-server delete --resource-group <rg> --name <server> --yes
+# etc.
+```
+
+---
+
+## Rollback Runbook (Execute Within 30 Minutes)
+
+```bash
+#!/bin/bash
+# ROLLBACK SCRIPT — Execute if production cutover fails
+# Time target: Complete rollback within 30 minutes of decision
+
+echo "$(date): ROLLBACK INITIATED"
+echo "$(date): Incident Commander: ______________"
+echo "$(date): Reason: ______________"
+
+# STEP 1 (minute 0-2): Revert DNS to Azure (highest priority)
+AZURE_IP="<AZURE_IP_NOTED_BEFORE_CUTOVER>"
+
+az network dns record-set a update \
+  --resource-group <rg> \
+  --zone-name <zone> \
+  --name app-prod \
+  --set "aRecords[0].ipv4Address=${AZURE_IP}"
+
+echo "$(date): DNS reverted to Azure IP $AZURE_IP"
+
+# Verify DNS propagation
+sleep 10
+RESOLVED=$(nslookup app-prod.<zone> 8.8.8.8 | grep Address | tail -1 | awk '{print $2}')
+echo "$(date): DNS now resolves to: $RESOLVED"
+
+# STEP 2 (minute 2-5): Restart Azure resources
+echo "$(date): Restarting Azure resources..."
+az aks scale --resource-group <rg> --name <aks-cluster> --node-count 3
+az postgres flexible-server start --resource-group <rg> --name <db-server>
+
+# STEP 3 (minute 5-10): Verify Azure app is responding
+sleep 60  # Wait for AKS to scale up
+curl -sk https://app-prod.<zone>/health
+echo "$(date): Azure app health check above"
+
+# STEP 4 (minute 10-15): Restore Azure DNS TTL to original value
+az network dns record-set a update \
+  --resource-group <rg> \
+  --zone-name <zone> \
+  --name app-prod \
+  --set ttl=3600  # restore original TTL
+
+echo "$(date): ROLLBACK COMPLETE"
+echo "$(date): Please file a post-incident report within 24 hours"
+```
+
+---
+
+## Azure Cost Verification After Cutover
+
+```bash
+# After full decommission, verify Azure costs dropped:
+
+# Check current month's Azure spending
+az consumption usage list \
+  --start-date $(date -d "first day of this month" +%Y-%m-%d) \
+  --end-date $(date +%Y-%m-%d) \
+  --query "[].{service:instanceName, cost:pretaxCost}" \
+  --output table | sort -k2 -nr | head -20
+
+# Create a budget alert so you know if Azure cost is unexpectedly high
+az consumption budget create \
+  --amount 1000 \
+  --budget-name PostMigrationBudget \
+  --category Cost \
+  --time-grain Monthly \
+  --time-period-start $(date +%Y-%m-01) \
+  --time-period-end $(date -d "+12 months" +%Y-%m-01) \
+  --notifications '[{"enabled":true,"operator":"GreaterThan","threshold":80,"contactEmails":["you@company.com"]}]'
+
+echo "Budget alert set: email when Azure spend > 80% of $1000/month"
+```
+

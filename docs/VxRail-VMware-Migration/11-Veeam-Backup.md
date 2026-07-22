@@ -612,3 +612,258 @@ sudo firewall-cmd --permanent --add-port=10006/tcp  # VBR communication
 sudo firewall-cmd --permanent --add-port=10002/tcp  # Data path
 sudo firewall-cmd --reload
 ```
+
+---
+
+## Veeam Setup — Complete Installation and Configuration
+
+### Veeam Architecture on VxRail
+
+```
++------------------+         +-------------------+
+| Veeam Backup     |         | NAS Backup        |
+| & Replication    +-------->| Repository        |
+| Server           |  LAN    | (Synology NAS     |
+| Windows Server   |         |  10.0.1.50)       |
+| 10.0.1.40        |         | NFS: 20TB usable  |
++--------+---------+         +-------------------+
+         |
+         | vSphere API (HotAdd transport)
+         |
++--------v---------+
+| VMware vCenter   |
+| 10.0.1.10        |
++--------+---------+
+         |
+         | All 6 VxRail nodes
+    +----+----+----+----+----+----+
+    |    |    |    |    |    |    |
+  ESXi ESXi ESXi ESXi ESXi ESXi
+   1    2    3    4    5    6
+
+HotAdd transport: Veeam mounts VM disk directly via ESXi 
+(no network copy — backup data travels over vSAN, not LAN)
+```
+
+---
+
+### Step 1: Deploy Veeam Server VM
+
+```
+1. Create a Windows Server 2022 VM on VxRail:
+   Name: veeam-server-01
+   CPU: 8 vCPU
+   RAM: 16 GB
+   Disk-1 (OS): 100 GB (vsan-production)
+   Disk-2 (Staging): 500 GB (vsan-production) — for temporary restore staging
+   Network: PG-Management (VLAN 10)
+   IP: 10.0.1.40
+
+2. Install Windows Server 2022 (standard GUI install)
+3. Set hostname: veeam-server-01
+4. Assign static IP: 10.0.1.40/24, GW 10.0.1.1, DNS 10.0.1.5
+5. Add DNS record: veeam.internal.company.com → 10.0.1.40
+```
+
+### Step 2: Install Veeam Backup & Replication
+
+```
+Download: https://www.veeam.com/products/veeam-data-platform/backup-replication.html
+(30-day trial or production license)
+
+Run installer: VeeamBackup&Replication_12.x.x_xxxxx.exe
+
+Installation wizard:
+  → Accept license agreement
+  → Install: Veeam Backup & Replication
+  → License: Import your license file (or use trial)
+  → Components: Select all defaults
+  → SQL Server: Install SQL Express (included) or use existing SQL
+  → Service account: Local System (or domain service account)
+  → Default ports: Keep defaults (9392, 9401, etc.)
+  → Finish — reboot when prompted
+```
+
+### Step 3: Add vCenter as Managed Server
+
+```
+Open Veeam Console (on veeam-server-01 or remote):
+
+1. Go to: Backup Infrastructure → Managed Servers → Add Server
+2. Select: VMware vSphere → vCenter Server
+3. DNS/IP: vcenter.internal.company.com
+4. Credentials: administrator@vsphere.local / <vCenter password>
+5. Port: 443
+6. Click: Test Connection → should show "Connection successful"
+7. Click: Finish
+
+Result: Veeam can now see all VMs in your VxRail cluster
+```
+
+### Step 4: Add NAS as Backup Repository
+
+```
+1. Mount NFS share on Veeam server (Windows):
+   → Open Computer Management → Disk Management
+   → OR: Map network drive: \\nas.internal.company.com\veeam-backups
+   → Letter: V:
+
+2. In Veeam: Backup Infrastructure → Backup Repositories → Add Repository
+   → Type: Network attached storage
+   → Name: NAS-Primary-Repo
+   → Path: V:\  (or UNC path \\10.0.1.50\veeam-backups)
+   → Concurrent tasks: 4 (adjust per NAS performance)
+   → Click Finish
+```
+
+### Step 5: Create Backup Jobs (One Per Environment)
+
+```
+For each environment (Dev, QA, PreProd, Prod):
+
+Veeam Console → Home → Backup Jobs → Virtual machine → Add
+
+JOB 1: Backup-Dev
+  Name: Backup-Dev-Daily
+  VMs to backup:
+    → Add VM → Browse vCenter → Select all VMs in Dev folder
+    (k8s-worker-1, db-dev-01, mongo-dev-01)
+  Storage:
+    → Backup repository: NAS-Primary-Repo
+    → Restore points: 7 (keep 1 week)
+  Schedule:
+    → Run automatically: Daily at 02:00
+    → Retry failed: 3 times, every 10 minutes
+  Guest processing:
+    → Enable: Application-aware processing
+    → Credentials: oracle / <vm password>
+    → Pre-freeze script: /opt/scripts/pre-freeze.sh
+    → Post-thaw script: /opt/scripts/post-thaw.sh
+  Click Finish
+
+JOB 2: Backup-QA
+  (Same as Dev, select QA VMs, schedule at 02:30)
+
+JOB 3: Backup-PreProd
+  Restore points: 14 (2 weeks)
+  Schedule: Daily at 01:00 + Weekly full on Sunday at 00:00
+
+JOB 4: Backup-Prod
+  Restore points: 30 (1 month daily + 52 weekly)
+  Schedule: Daily at 00:00 + Weekly full on Saturday at 22:00 + Monthly full
+  GFS retention: Keep weekly for 4 weeks, monthly for 12 months
+```
+
+### Step 6: Pre/Post Freeze Scripts on Oracle Linux VMs
+
+```bash
+# /opt/scripts/pre-freeze.sh (runs BEFORE Veeam snapshot)
+#!/bin/bash
+set -euo pipefail
+
+LOG=/var/log/veeam-freeze.log
+echo "$(date): Pre-freeze starting" >> $LOG
+
+# PostgreSQL: create consistent checkpoint
+if systemctl is-active --quiet postgresql-15; then
+  psql -U postgres -c "CHECKPOINT;" >> $LOG 2>&1
+  echo "$(date): PostgreSQL checkpoint done" >> $LOG
+fi
+
+# MongoDB: fsync + lock for consistent snapshot
+if systemctl is-active --quiet mongod; then
+  mongo --eval "db.fsyncLock()" >> $LOG 2>&1
+  echo "$(date): MongoDB fsyncLock done" >> $LOG
+fi
+
+echo "$(date): Pre-freeze complete" >> $LOG
+exit 0
+```
+
+```bash
+# /opt/scripts/post-thaw.sh (runs AFTER Veeam snapshot)
+#!/bin/bash
+set -euo pipefail
+
+LOG=/var/log/veeam-freeze.log
+echo "$(date): Post-thaw starting" >> $LOG
+
+# MongoDB: unlock after snapshot
+if systemctl is-active --quiet mongod; then
+  mongo --eval "db.fsyncUnlock()" >> $LOG 2>&1
+  echo "$(date): MongoDB fsyncUnlock done" >> $LOG
+fi
+
+echo "$(date): Post-thaw complete" >> $LOG
+exit 0
+```
+
+```bash
+# Deploy scripts to all DB VMs via Ansible
+SCRIPT_DIR="/opt/scripts"
+for VM in db-dev-01 db-qa-01 db-preprod-01 db-preprod-02 \
+           db-prod-01 db-prod-02 db-prod-03 \
+           mongo-dev-01 mongo-qa-01 mongo-preprod-01 \
+           mongo-preprod-02 mongo-prod-01 mongo-prod-02 mongo-prod-03; do
+  ssh oracle@$VM "sudo mkdir -p $SCRIPT_DIR"
+  scp pre-freeze.sh post-thaw.sh oracle@$VM:/tmp/
+  ssh oracle@$VM "sudo mv /tmp/pre-freeze.sh /tmp/post-thaw.sh $SCRIPT_DIR/ && sudo chmod +x $SCRIPT_DIR/*.sh"
+done
+```
+
+---
+
+### Backup Job Schedule Summary
+
+| Job | VMs | Frequency | Retention | Backup Window |
+|-----|-----|-----------|-----------|--------------|
+| Backup-Dev | Worker-1, db-dev-01, mongo-dev-01 | Daily | 7 days | 02:00-04:00 |
+| Backup-QA | Worker-2, db-qa-01, mongo-qa-01 | Daily | 7 days | 02:30-04:30 |
+| Backup-PreProd | Workers 3-4, preprod DBs | Daily + Weekly | 14 days + 4 weeks | 01:00-03:00 |
+| Backup-Prod | Workers 5-6, prod DBs, services | Daily + Weekly + Monthly | 30 days + 52 weeks + 12 months | 00:00-02:00 |
+
+---
+
+### Restore Procedures
+
+#### Full VM Restore
+
+```
+Veeam Console → Home → select backup → Restore → Entire VM
+
+1. Select: "Restore entire VM"
+2. Choose: restore point (date/time)
+3. Destination: Original location (overwrites) or New location (safe test restore)
+4. For test restore → select: "New location" → different datastore + network (isolated VLAN)
+5. Power on VM: Yes
+6. Reason: "DR Test - 2026-07" (for audit trail)
+7. Click Finish → Monitor restore progress
+```
+
+#### File-Level Restore (restore one file from VM)
+
+```
+Veeam Console → select backup → Restore → Guest files → Microsoft Windows/Linux
+
+Linux file restore:
+1. Select backup + restore point
+2. Browse filesystem: navigate to /etc/postgresql/
+3. Right-click file → Restore to original location (or Copy to)
+4. Click Finish
+```
+
+#### Monthly Test Restore Verification
+
+```bash
+# Each month, perform a test restore of Prod backup:
+# 1. Restore to isolated network (VLAN 999 — no routing to production)
+# 2. Power on restored VMs
+# 3. Verify PostgreSQL starts and data is readable:
+psql -U postgres -c "SELECT count(*) FROM information_schema.tables;"
+# 4. Verify MongoDB starts and data is readable:
+mongo --eval "db.stats()"
+# 5. Document restore time (RTO actual vs target)
+# 6. Power off and delete test VMs
+# Log results in: https://wiki.company.com/disaster-recovery/test-log
+```
+

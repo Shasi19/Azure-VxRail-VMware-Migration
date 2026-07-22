@@ -360,3 +360,180 @@ All other tools (Kubernetes, Harbor, ArgoCD, Prometheus, Grafana, MinIO, Patroni
 | **Total** | **$900** | **$54,600** | Most orgs spend $5,000–$15,000 |
 
 > **Key insight:** If you already have an enterprise-grade switch with VLAN trunking, a firewall that supports IPsec VPN, and a NAS for backups — your additional cost is minimal (just the Azure VPN Gateway during migration).
+
+---
+
+## 10. Procurement Approval Flowchart
+
+```mermaid
+flowchart TD
+    A([Migration Decision Made]) --> B[IT Team: Infrastructure Assessment]
+    B --> C{Existing switches\nsupport VLANs + LACP?}
+    C -->|Yes| D[No switch purchase needed]
+    C -->|No| E[Add switches to RFQ]
+    D --> F[Compile Full RFQ]
+    E --> F
+    F --> G[Send RFQ to 3 Vendors\nDell, Cisco, Juniper]
+    G --> H[Receive Quotes\n5-7 business days]
+    H --> I[Technical Evaluation\nIT Team]
+    I --> J[Cost-Benefit Analysis\nIT Manager]
+    J --> K{Budget within\napproved limit?}
+    K -->|Yes| L[IT Manager Approval]
+    K -->|No| M[Finance Director Review]
+    M --> N{Finance\nApproves?}
+    N -->|No| O[Scope Reduction / Phased Purchase]
+    O --> F
+    N -->|Yes| L
+    L --> P[CIO Sign-off if > threshold]
+    P --> Q[Raise Purchase Order]
+    Q --> R[Vendor Acknowledgment]
+    R --> S[Delivery - 4 to 8 weeks]
+    S --> T[Incoming Inspection\nSerial numbers, quantity]
+    T --> U{All items\nreceived OK?}
+    U -->|No| V[Raise Discrepancy with Vendor]
+    V --> S
+    U -->|Yes| W[Acceptance Testing\nRack, power, basic boot]
+    W --> X([Procurement Complete\nReady for Setup])
+```
+
+---
+
+## 11. Procurement Timeline (Gantt)
+
+```mermaid
+gantt
+    title Procurement Timeline
+    dateFormat  YYYY-MM-DD
+    section Planning
+    Infrastructure assessment     :a1, 2024-01-01, 5d
+    Compile requirements doc      :a2, after a1, 3d
+    section Vendor Process
+    Issue RFQ to vendors          :b1, after a2, 2d
+    Vendor quote period           :b2, after b1, 7d
+    Technical evaluation          :b3, after b2, 3d
+    Cost-benefit analysis         :b4, after b3, 2d
+    section Approvals
+    IT Manager approval           :c1, after b4, 2d
+    Finance Director review       :c2, after c1, 3d
+    CIO sign-off                  :c3, after c2, 2d
+    section Ordering
+    Raise Purchase Order          :d1, after c3, 1d
+    Vendor order acknowledgment   :d2, after d1, 2d
+    section Delivery
+    Lead time - hardware          :e1, after d2, 35d
+    Incoming inspection           :e2, after e1, 2d
+    Acceptance testing            :e3, after e2, 3d
+    section Ready
+    Rack and stack                :f1, after e3, 2d
+    Power and cable               :f2, after f1, 2d
+    Ready for configuration       :milestone, after f2, 0d
+```
+
+---
+
+## 12. Request for Quotation (RFQ) Template
+
+Use this template when sending to Dell (or other vendors):
+
+| # | Item | Specification Required | Qty | Budget (USD) | Vendor Part # | Lead Time |
+|---|------|------------------------|-----|-------------|--------------|-----------|
+| 1 | ToR Switch - Primary | 48x 25GbE SFP28, 6x 100GbE QSFP28, LACP 802.3ad, VLAN 802.1Q, MTU 9216, dual PSU | 1 | 18,000 | | |
+| 2 | ToR Switch - Secondary | Same as above (redundancy) | 1 | 18,000 | | |
+| 3 | SFP28 DAC Cables (25GbE) | Passive DAC, 1m length, for VxRail-to-switch | 24 | 1,200 | | |
+| 4 | QSFP28 DAC Cable (100GbE) | Passive DAC, 3m, inter-switch uplink | 4 | 800 | | |
+| 5 | NAS - Backup Storage | 12-bay, 10GbE NFS, min 60TB raw, redundant PSU | 1 | 5,000 | | |
+| 6 | NAS Hard Drives | 10TB SATA 7200RPM enterprise (12 drives) | 12 | 3,600 | | |
+| 7 | UPS - Primary | 10kVA, tower or rack, 30min runtime at 50% load | 1 | 4,000 | | |
+| 8 | SFP+ RJ45 Transceiver | 10GbE copper, for OOB management switch | 4 | 400 | | |
+| 9 | Rack PDU | 32A, 3-phase or 16A single-phase, metered | 2 | 1,000 | | |
+| 10 | Patch Panel (Cat6a) | 24-port, for structured cabling | 2 | 200 | | |
+| **Total** | | | | **~$52,200** | | |
+
+> **Note:** Request 3-year hardware warranty and next-business-day on-site support for switches and NAS.
+
+---
+
+## 13. Questions to Ask Dell Before Buying Additional Switches
+
+Before purchasing new switches, verify these with your Dell account team:
+
+```
+Questions for Dell VxRail team:
+  1. "Are our existing ToR switches on the Dell VxRail Network Compatibility Matrix?"
+     → Dell publishes a validated switch list. Ask for it.
+  
+  2. "Is our existing switch capable of LACP 802.3ad with 25GbE SFP28 uplinks?"
+     → VxRail nodes use LACP bonded NICs by default.
+  
+  3. "Does VxRail Manager auto-detect our switch model for zero-touch network config?"
+     → Dell PowerSwitch has deep VxRail integration; Cisco/Juniper are manual.
+  
+  4. "What is the minimum MTU the vSAN network requires?"
+     → Answer: MTU 9000 (jumbo frames) is required for vSAN traffic.
+  
+  5. "Do you recommend stacking the 2 ToR switches (Virtual Link Trunking/VLT) 
+     or running them as independent switches with LACP to VxRail?"
+     → Answer: VLT stacking gives a single management point + active-active uplinks.
+  
+  6. "Are there Dell Professional Services available for switch configuration 
+     as part of the VxRail deployment?"
+     → Often yes — Dell PS can pre-configure switches per VxRail spec.
+```
+
+---
+
+## 14. Data Center Infrastructure Checklist (Before Rack Arrival)
+
+Complete this BEFORE hardware arrives:
+
+### 14.1 Rack Space
+
+```
+Rack Audit:
+  [ ] Identify which rack(s) will receive new hardware
+  [ ] Measure available U space:
+        Current VxRail (6 nodes): typically 12U (2U each)
+        New switches (2x): 2U each = 4U
+        NAS: 2U
+        UPS: 4-8U
+        Total new: ~10-14U
+  [ ] Confirm rack has enough vertical space
+  [ ] Confirm rack rails are compatible (Dell readyrails vs square-hole vs round-hole)
+  [ ] Order rack rails for NAS and switches if not included
+```
+
+### 14.2 Power
+
+```
+Power Audit:
+  [ ] Measure current power draw of VxRail cluster (from VxRail Manager → Power → Summary)
+  [ ] Typical: 6-node VxRail draws 2-4 kW under normal load
+  [ ] New hardware adds: 2 switches (~150W each) + NAS (~200W) + UPS (~100W overhead)
+  [ ] Total addition: ~600W
+  [ ] Confirm PDU in rack has available outlets and sufficient amperage
+  [ ] Confirm UPS can handle total load (VxRail + new hardware)
+  [ ] For 3-phase power: confirm phases are balanced
+```
+
+### 14.3 Cooling
+
+```
+Cooling Audit:
+  [ ] Check data center cooling capacity (CRAC/CRAH units)
+  [ ] Confirm hot aisle / cold aisle containment is in place
+  [ ] Measure inlet temperature on existing VxRail nodes (should be 18-27°C)
+  [ ] New hardware thermal output: ~600W additional → 2048 BTU/hr
+  [ ] Verify cooling system can handle this additional heat load
+```
+
+### 14.4 Cabling
+
+```
+Cabling Audit:
+  [ ] Count fiber runs needed: 6 nodes x 2 NICs each = 12 cables to switch-1, 12 to switch-2
+  [ ] Count inter-switch uplink cables (2-4 QSFP28 cables between the 2 ToR switches)
+  [ ] Confirm cable management arms are available for switches
+  [ ] Label plan: assign cable labels before installation (VxRail1-vmnic0-SW1-P1, etc.)
+  [ ] Check if existing cabling already connects VxRail to a switch — may only need reconfiguration
+```
+
