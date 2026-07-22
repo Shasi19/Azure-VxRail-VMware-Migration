@@ -5,7 +5,10 @@
 > **Current On-Prem Infrastructure:** 6-node Dell VxRail HCI cluster running VMware vSphere  
 > **Source:** Azure (AKS + Cosmos DB + ACR + PostgreSQL + Storage Account) — 4 environments  
 > **Target:** Kubernetes on VMware VMs + vSAN storage — same 4 environments  
-> **Migration Order:** Phase 1 → Dev + QA | Phase 2 → PreProd + Prod
+> **Migration Order:** Phase 1 → Dev + QA | Phase 2 → PreProd + Prod  
+> **VM OS:** Oracle Linux 9 (OL9) — all VMs use OL9, not Ubuntu. See [13-Oracle-Linux-VMs.md](13-Oracle-Linux-VMs.md)  
+> **Backup:** Veeam Backup and Replication — existing team tool, retained. See [14-Veeam-Backup.md](14-Veeam-Backup.md)  
+> **Patching:** Monthly (security) + Quarterly (full) + Semi-annual (VxRail). See [15-Patching-Cycles.md](15-Patching-Cycles.md)
 
 ---
 
@@ -129,8 +132,8 @@ Week 7-8: Dev+QA Validation            Week 16-17: Prod Go-Live + Stabilize
 | File | Contents | Phase |
 |------|----------|-------|
 | [01-Infrastructure-Assessment.md](01-Infrastructure-Assessment.md) | vSphere resource audit, vSAN capacity planning, readiness checklist | Pre-work |
-| [02-VM-Provisioning-vSphere.md](02-VM-Provisioning-vSphere.md) | Create VMs via vCenter UI + govc CLI + cloud-init | Pre-work |
-| [03-Network-vSphere.md](03-Network-vSphere.md) | DVS port groups, VLANs, MetalLB config, keepalived VIP, firewall | Pre-work |
+| [02-VM-Provisioning-vSphere.md](02-VM-Provisioning-vSphere.md) | Create VMs via vCenter UI + govc CLI + cloud-init (Oracle Linux 9) | Pre-work |
+| [03-Network-vSphere.md](03-Network-vSphere.md) | DVS port groups, VLANs, MetalLB config, keepalived VIP, firewalld | Pre-work |
 | [04-Storage-vSAN.md](04-Storage-vSAN.md) | vSAN storage policies, vSphere CSI driver, StorageClasses, MinIO | Pre-work |
 | [07-Kubernetes-vSphere.md](07-Kubernetes-vSphere.md) | kubeadm HA on VMware VMs, vSphere CCM, Calico CNI, MetalLB end-to-end | Pre-work |
 
@@ -142,3 +145,11 @@ Week 7-8: Dev+QA Validation            Week 16-17: Prod Go-Live + Stabilize
 | [05-Phase1-Dev-QA.md](05-Phase1-Dev-QA.md) | Phase 1: Dev + QA week-by-week plan with go/no-go gates | Phase 1 |
 | [06-Phase2-PreProd-Prod.md](06-Phase2-PreProd-Prod.md) | Phase 2: PreProd + Prod with live pglogical replication | Phase 2 |
 | [08-Cutover-Runbook.md](08-Cutover-Runbook.md) | DNS cutover scripts, rollback procedures, 72h post-cutover monitoring | Both |
+
+### Oracle Linux, Backup, and Patching
+
+| File | Contents | When |
+|------|----------|------|
+| [13-Oracle-Linux-VMs.md](13-Oracle-Linux-VMs.md) | **Oracle Linux 9 VM guide** — OL9 template creation, dnf vs apt equivalents, K8s on OL9, SELinux, firewalld, PostgreSQL/MongoDB on OL9, troubleshooting | Before VM creation |
+| [14-Veeam-Backup.md](14-Veeam-Backup.md) | **Veeam Backup and Replication** — VBR installation, VM-level backup jobs, Veeam Agent for Linux on OL9, Kasten K10 for K8s workloads, pre/post-freeze scripts for PostgreSQL/MongoDB, restore procedures | During setup |
+| [15-Patching-Cycles.md](15-Patching-Cycles.md) | **Patch cycles** — Monthly OS security, Quarterly full patch (OS + K8s + DB), Semi-annual VxRail/VMware, Annual major upgrades; rolling node patch scripts, rollback procedures | Ongoing |

@@ -102,52 +102,55 @@ vCenter → PG-K8s-Nodes → Settings → Security
 
 > **Important:** MetalLB in ARP mode requires **Forged transmits: Accept** and **MAC address changes: Accept** on the port group, otherwise VIP advertisement will be silently dropped by DVS.
 
-### 3.2 Host-Based Firewall on K8s Nodes (ufw)
+### 3.2 Host-Based Firewall on K8s Nodes (firewalld — Oracle Linux 9)
 
 ```bash
 # Apply on all K8s nodes — masters and workers
 # Run via ssh loop or Ansible
+# Oracle Linux 9 uses firewalld, NOT ufw
 
 NODES=(10.0.3.11 10.0.3.12 10.0.3.13 10.0.4.21 10.0.4.22)
 
 for NODE in "${NODES[@]}"; do
-ssh ubuntu@"$NODE" 'sudo bash -s' << 'SCRIPT'
-ufw --force reset
-ufw default deny incoming
-ufw default allow outgoing
+ssh oracle@"$NODE" 'sudo bash -s' << 'SCRIPT'
+# Enable firewalld
+systemctl enable --now firewalld
 
 # SSH from management subnet
-ufw allow from 10.0.1.0/24 to any port 22
+firewall-cmd --permanent --add-rich-rule='rule family=ipv4 source address="10.0.1.0/24" port port=22 protocol=tcp accept'
 
 # Kubernetes API server
-ufw allow 6443/tcp
+firewall-cmd --permanent --add-port=6443/tcp
 
 # etcd (control plane only)
-ufw allow from 10.0.3.0/24 to any port 2379:2380/tcp
+firewall-cmd --permanent --add-rich-rule='rule family=ipv4 source address="10.0.3.0/24" port port="2379-2380" protocol=tcp accept'
 
 # Kubelet API
-ufw allow 10250/tcp
+firewall-cmd --permanent --add-port=10250/tcp
 
 # NodePort services (accessed by load balancer and internal users)
-ufw allow 30000:32767/tcp
+firewall-cmd --permanent --add-port=30000-32767/tcp
 
-# Calico BGP (if using BGP mode) + VXLAN
-ufw allow 179/tcp
-ufw allow 4789/udp
-ufw allow 5473/tcp
+# Calico BGP + VXLAN
+firewall-cmd --permanent --add-port=179/tcp
+firewall-cmd --permanent --add-port=4789/udp
+firewall-cmd --permanent --add-port=5473/tcp
 
 # MetalLB member communication
-ufw allow from 10.0.4.0/24 to any port 7946
-ufw allow from 10.0.4.0/24 to any port 7946/udp
+firewall-cmd --permanent --add-port=7946/tcp
+firewall-cmd --permanent --add-port=7946/udp
 
 # Allow all inter-node traffic within K8s subnets
-ufw allow from 10.0.3.0/24
-ufw allow from 10.0.4.0/24
-ufw allow from 192.168.0.0/16  # Pod CIDR (Calico)
-ufw allow from 10.96.0.0/12    # Service CIDR
+firewall-cmd --permanent --add-rich-rule='rule family=ipv4 source address="10.0.3.0/24" accept'
+firewall-cmd --permanent --add-rich-rule='rule family=ipv4 source address="10.0.4.0/24" accept'
+firewall-cmd --permanent --add-rich-rule='rule family=ipv4 source address="192.168.0.0/16" accept'
+firewall-cmd --permanent --add-rich-rule='rule family=ipv4 source address="10.96.0.0/12" accept'
 
-ufw --force enable
-ufw status verbose
+# VRRP for keepalived
+firewall-cmd --permanent --add-rich-rule='rule protocol value="vrrp" accept'
+
+firewall-cmd --reload
+firewall-cmd --list-all
 SCRIPT
 done
 ```

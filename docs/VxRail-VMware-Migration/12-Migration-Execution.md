@@ -21,7 +21,7 @@ bash docs/VxRail-VMware-Migration/11-Initial-Setup-Before-Migration.md  # Sectio
 #### A1.1 — Initialize Control Plane (master-1)
 
 ```bash
-ssh ubuntu@10.0.3.11
+ssh oracle@10.0.3.11
 
 # 1. Run node prep (swap off, modules, containerd, kubeadm)
 # (see 07-Kubernetes-vSphere.md section 1 for full script)
@@ -360,17 +360,22 @@ kubectl get svc -n monitoring | grep grafana
 ### B1. Set Up Dev PostgreSQL
 
 ```bash
-ssh ubuntu@10.0.5.11   # db-dev-01
+ssh oracle@10.0.5.11   # db-dev-01
 
-# Install PostgreSQL 15
-sudo apt install -y postgresql-15 postgresql-client-15
+# Install PostgreSQL 15 (Oracle Linux 9 — from PostgreSQL official RPM repo)
+sudo dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-9-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+sudo dnf -qy module disable postgresql
+sudo dnf install -y postgresql15-server postgresql15 postgresql15-contrib
+
+# Initialize database cluster
+sudo /usr/pgsql-15/bin/postgresql-15-setup initdb
 
 # Allow remote connections
 sudo sed -i "s/#listen_addresses.*/listen_addresses = '*'/" \
-  /etc/postgresql/15/main/postgresql.conf
+  /var/lib/pgsql/15/data/postgresql.conf
 
 # Set max connections and memory
-sudo tee -a /etc/postgresql/15/main/postgresql.conf << 'EOF'
+sudo tee -a /var/lib/pgsql/15/data/postgresql.conf << 'EOF'
 max_connections = 200
 shared_buffers = 2GB
 effective_cache_size = 6GB
@@ -381,14 +386,17 @@ max_wal_senders = 10
 EOF
 
 # pg_hba.conf — allow K8s and masters
-sudo tee -a /etc/postgresql/15/main/pg_hba.conf << 'EOF'
+sudo tee -a /var/lib/pgsql/15/data/pg_hba.conf << 'EOF'
 host    all    all    10.0.3.0/24    scram-sha-256
 host    all    all    10.0.4.0/24    scram-sha-256
 host    all    all    10.0.5.0/24    scram-sha-256
 EOF
 
+# Firewall (OL9 uses firewalld)
+sudo firewall-cmd --permanent --add-service=postgresql && sudo firewall-cmd --reload
+
 # Create database and user
-sudo -u postgres psql << 'SQL'
+sudo -u postgres /usr/pgsql-15/bin/psql << 'SQL'
 CREATE DATABASE dev_db;
 CREATE USER dev_user WITH ENCRYPTED PASSWORD 'DevPostgres2026!';
 GRANT ALL PRIVILEGES ON DATABASE dev_db TO dev_user;
@@ -396,7 +404,7 @@ GRANT ALL PRIVILEGES ON DATABASE dev_db TO dev_user;
 GRANT ALL ON SCHEMA public TO dev_user;
 SQL
 
-sudo systemctl enable postgresql && sudo systemctl restart postgresql
+sudo systemctl enable postgresql-15 && sudo systemctl start postgresql-15
 
 # Verify
 psql "host=10.0.5.11 user=dev_user password=DevPostgres2026! dbname=dev_db" \
@@ -425,10 +433,10 @@ pg_dump \
 ls -lh /tmp/dev_db_*.dump
 
 # Step 3: Transfer to on-prem DB server
-scp /tmp/dev_db_*.dump ubuntu@10.0.5.11:/tmp/
+scp /tmp/dev_db_*.dump oracle@10.0.5.11:/tmp/
 
 # Step 4: Restore on on-prem
-ssh ubuntu@10.0.5.11 "
+ssh oracle@10.0.5.11 "
 pg_restore \
   --host=localhost \
   --port=5432 \
@@ -455,13 +463,21 @@ psql "host=10.0.5.11 user=dev_user password=DevPostgres2026! dbname=dev_db" \
 ### B3. Set Up Dev MongoDB
 
 ```bash
-ssh ubuntu@10.0.5.21   # mongo-dev-01
+ssh oracle@10.0.5.21   # mongo-dev-01
 
-# Install MongoDB 7.0
-wget -qO - https://www.mongodb.org/static/pgp/server-7.0.asc | sudo apt-key add -
-echo "deb [ arch=amd64 ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" \
-  | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
-sudo apt update && sudo apt install -y mongodb-org
+# Install MongoDB 7.0 — Oracle Linux 9 (RHEL9-compatible RPM repo)
+sudo tee /etc/yum.repos.d/mongodb-org-7.0.repo << 'EOF'
+[mongodb-org-7.0]
+name=MongoDB Repository
+baseurl=https://repo.mongodb.org/yum/redhat/9/mongodb-org/7.0/x86_64/
+gpgcheck=1
+enabled=1
+gpgkey=https://www.mongodb.org/static/pgp/server-7.0.asc
+EOF
+sudo dnf install -y mongodb-org
+
+# Firewall (OL9 uses firewalld)
+sudo firewall-cmd --permanent --add-port=27017/tcp && sudo firewall-cmd --reload
 
 # Configure
 sudo tee /etc/mongod.conf << 'EOF'
@@ -509,10 +525,10 @@ mongodump \
   --out=/tmp/cosmos-dev-$(date +%Y%m%d)
 
 # Transfer
-scp -r /tmp/cosmos-dev-* ubuntu@10.0.5.21:/tmp/
+scp -r /tmp/cosmos-dev-* oracle@10.0.5.21:/tmp/
 
 # Restore
-ssh ubuntu@10.0.5.21 "
+ssh oracle@10.0.5.21 "
 mongorestore \
   --uri='mongodb://admin:MongoAdmin2026!@localhost:27017/?authSource=admin' \
   --nsFrom='dev-cosmos.*' \
@@ -527,7 +543,7 @@ mongosh "mongodb://${COSMOS_ACCOUNT}:${COSMOS_KEY}@${COSMOS_HOST}:10255/dev-cosm
   --quiet --eval "db.getCollectionNames().forEach(c => print(c + ': ' + db[c].countDocuments()))"
 
 echo "=== On-prem counts ==="
-ssh ubuntu@10.0.5.21 "
+ssh oracle@10.0.5.21 "
   mongosh 'mongodb://dev_user:DevMongo2026!@localhost:27017/dev-cosmos?authSource=dev-cosmos' \
     --quiet --eval \"db.getCollectionNames().forEach(c => print(c + ': ' + db[c].countDocuments()))\"
 "
@@ -671,7 +687,7 @@ kubectl create secret generic mongo-credentials --namespace=qa \
 # For each worker 3-6 (10.0.4.23 through 10.0.4.26):
 for WORKER_IP in 10.0.4.23 10.0.4.24 10.0.4.25 10.0.4.26; do
   echo "Joining worker $WORKER_IP..."
-  ssh ubuntu@"${WORKER_IP}" "
+  ssh oracle@"${WORKER_IP}" "
     sudo bash /usr/local/bin/k8s-node-prep.sh
     sudo kubeadm join 10.0.3.100:6443 \
       --token <TOKEN> \
@@ -803,7 +819,7 @@ echo "Final: Cancel Azure subscription if no other services remain"
 |---------|--------------|-----|
 | Pod stuck Pending | `kubectl describe pod <name> -n <ns>` | Check node affinity, PVC status, resource quota |
 | PVC not binding | `kubectl describe pvc <name>` + CSI controller logs | Check disk.EnableUUID; check vSphere CSI pods |
-| DB connection refused | `telnet <db-ip> 5432` from worker | Check pg_hba.conf; check ufw on DB VM |
+| DB connection refused | `telnet <db-ip> 5432` from worker | Check pg_hba.conf; check firewalld on DB VM: firewall-cmd --list-ports |
 | MongoDB auth failure | `mongosh --eval "db.runCommand({ping:1})"` | Check authSource in URI; check user created in correct db |
 | pglogical lag increasing | Check Azure network, VPN bandwidth | Increase VPN SKU or use ExpressRoute; check DML rate |
 | K8s node NotReady | `kubectl describe node` | Check kubelet logs; check containerd; check cloud-provider setting |

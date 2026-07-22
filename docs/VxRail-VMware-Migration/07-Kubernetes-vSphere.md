@@ -45,16 +45,9 @@ net.ipv4.ip_forward                 = 1
 EOF
 sysctl --system
 
-# 4. Install containerd (container runtime)
-apt-get update && apt-get install -y ca-certificates curl gnupg
-install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
-  | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-chmod a+r /etc/apt/keyrings/docker.gpg
-echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] \
-  https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
-  > /etc/apt/sources.list.d/docker.list
-apt-get update && apt-get install -y containerd.io
+# 4. Install containerd (container runtime) — Oracle Linux 9 (dnf)
+dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+dnf install -y containerd.io
 
 # Configure containerd with systemd cgroup driver (required for K8s 1.22+)
 mkdir -p /etc/containerd
@@ -63,15 +56,18 @@ sed -i 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.to
 systemctl restart containerd
 systemctl enable containerd
 
-# 5. Install kubeadm, kubelet, kubectl 1.29
-curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.29/deb/Release.key \
-  | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
-echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] \
-  https://pkgs.k8s.io/core:/stable:/v1.29/deb/ /' \
-  > /etc/apt/sources.list.d/kubernetes.list
-apt-get update
-apt-get install -y kubelet=1.29.0-1.1 kubeadm=1.29.0-1.1 kubectl=1.29.0-1.1
-apt-mark hold kubelet kubeadm kubectl
+# 5. Install kubeadm, kubelet, kubectl 1.29 — Oracle Linux 9 RPM repo
+cat > /etc/yum.repos.d/kubernetes.repo << 'KREPO'
+[kubernetes]
+name=Kubernetes
+baseurl=https://pkgs.k8s.io/core:/stable:/v1.29/rpm/
+enabled=1
+gpgcheck=1
+gpgkey=https://pkgs.k8s.io/core:/stable:/v1.29/rpm/repodata/repomd.xml.key
+exclude=kubelet kubeadm kubectl cri-tools kubernetes-cni
+KREPO
+dnf install -y --disableexcludes=kubernetes kubelet-1.29.0 kubeadm-1.29.0 kubectl-1.29.0
+dnf versionlock add kubelet kubeadm kubectl
 
 # 6. Enable kubelet
 systemctl enable kubelet
@@ -91,7 +87,7 @@ Install and configure keepalived BEFORE running kubeadm (the VIP must exist for 
 
 ```bash
 # On all 3 masters
-sudo apt install -y keepalived haproxy
+sudo dnf install -y keepalived haproxy
 
 # keepalived (master-1 — STATE MASTER, priority 101)
 sudo tee /etc/keepalived/keepalived.conf << 'EOF'

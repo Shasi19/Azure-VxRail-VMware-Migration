@@ -8,7 +8,10 @@
 
 ---
 
-## 1. Prepare Ubuntu 22.04 Cloud Image Template
+## 1. Prepare Oracle Linux 9 Cloud Image Template
+
+> **VM Operating System: Oracle Linux 9 (OL9)** — your team will use Oracle Linux VMs.  
+> For full OL9 template setup, cloud-init, and installation details, see [13-Oracle-Linux-VMs.md](13-Oracle-Linux-VMs.md).
 
 This template is used to clone all K8s and database VMs.
 
@@ -24,34 +27,31 @@ export GOVC_NETWORK="PG-K8s-Nodes"
 export GOVC_RESOURCE_POOL="VxRail-Cluster/Resources"
 export GOVC_DATACENTER="Datacenter"
 
-# Download Ubuntu 22.04 cloud image (OVA format — VMDK-based)
-wget -O ubuntu-22.04-server.ova \
-  "https://cloud-images.ubuntu.com/releases/22.04/release/ubuntu-22.04-server-cloudimg-amd64.ova"
+# Download Oracle Linux 9 ISO
+wget https://yum.oracle.com/ISOS/OracleLinux/OL9/u4/x86_64/OracleLinux-R9-U4-x86_64-dvd.iso \
+  -O /tmp/OracleLinux-9.4-x86_64.iso
 
-# Import OVA to vCenter as a template
-govc import.ova \
-  --name="ubuntu-22.04-template" \
-  --folder="/Datacenter/vm/Templates" \
-  ubuntu-22.04-server.ova
+# Upload ISO to vSAN datastore
+govc datastore.upload -ds=vsanDatastore \
+  /tmp/OracleLinux-9.4-x86_64.iso \
+  iso/OracleLinux-9.4-x86_64.iso
 
-# Convert to template (prevents accidental power-on)
-govc vm.markastemplate ubuntu-22.04-template
+# Create base VM with Oracle Linux guest type
+govc vm.create \
+  -c=4 -m=8192 -disk=60GB \
+  -net="PG-K8s-Nodes" \
+  -g=oracleLinux9_64Guest \
+  -on=false \
+  ol9-base-template
+
+# Install OL9 via vCenter console, then customize (dnf update, open-vm-tools, cloud-init)
+# See 13-Oracle-Linux-VMs.md Section 1.4 for full post-install steps
+
+# Mark as template
+govc vm.markastemplate ol9-base-template
 ```
 
-### 1.2 Customize Template (install VMware Tools)
-
-```bash
-# Power on template temporarily to install VMware Tools
-govc vm.markasvm ubuntu-22.04-template
-govc vm.power -on ubuntu-22.04-template
-
-# SSH in (use vCenter console) and install open-vm-tools
-# apt update && apt install -y open-vm-tools cloud-init
-
-# Power off and re-mark as template
-govc vm.power -off ubuntu-22.04-template
-govc vm.markastemplate ubuntu-22.04-template
-```
+### 1.2 Template Packages (Oracle Linux 9 dnf)
 
 ---
 
