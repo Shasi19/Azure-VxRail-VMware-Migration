@@ -4,6 +4,188 @@
 
 ---
 
+## Flowchart 1 — Monitoring Stack Architecture (Metrics Flow)
+
+```
+╔══════════════════════════════════════════════════════════════════╗
+║              METRICS COLLECTION & VISUALISATION STACK           ║
+╚══════════════════════════════════════════════════════════════════╝
+
+  APPLICATION LAYER (sources)
+  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────────┐
+  │ Microsvcs  │ │ PostgreSQL │ │ K8s Nodes  │ │ Patroni / etcd │
+  │ /metrics   │ │ pg_exporter│ │ node-export│ │ /metrics       │
+  └──────┬─────┘ └──────┬─────┘ └──────┬─────┘ └────────┬───────┘
+         │              │              │                 │
+         └──────────────┴──────────────┴─────────────────┘
+                                 │  scrape (pull, 30 s)
+                                 ▼
+  ┌──────────────────────────────────────────────────────────────┐
+  │  PROMETHEUS (k8s namespace: monitoring)                      │
+  │  • Stores time-series metrics (15-day retention)            │
+  │  • Evaluates alerting rules (alert.rules.yml)               │
+  │  • Fires alerts → Alertmanager                              │
+  └────────────────────────┬──────────────────────┬─────────────┘
+                           │                      │
+              scrape +     │                      │ alerts
+              remote write │                      ▼
+                           │        ┌─────────────────────────┐
+                           │        │  ALERTMANAGER           │
+                           │        │  Route: P1 → PagerDuty  │
+                           │        │  Route: P2 → Slack      │
+                           │        │  Route: P3 → email      │
+                           │        └─────────────────────────┘
+                           │
+                           ▼
+  ┌──────────────────────────────────────────────────────────────┐
+  │  GRAFANA (k8s namespace: monitoring, NodePort 3000)          │
+  │  ┌──────────────────┐  ┌──────────────────────────────────┐ │
+  │  │ K8s Cluster      │  │ PostgreSQL / Patroni             │ │
+  │  │ Dashboard        │  │ Dashboard                        │ │
+  │  └──────────────────┘  └──────────────────────────────────┘ │
+  │  ┌──────────────────┐  ┌──────────────────────────────────┐ │
+  │  │ Application SLO  │  │ Veeam Backup Status              │ │
+  │  │ Dashboard        │  │ Dashboard                        │ │
+  │  └──────────────────┘  └──────────────────────────────────┘ │
+  └──────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Flowchart 2 — Log Aggregation Flow
+
+```
+  APPLICATION LOG SOURCES
+  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐
+  │ App pods   │ │ System     │ │ PostgreSQL │ │ Kubernetes │
+  │ stdout/err │ │ journald   │ │ pg_log     │ │ audit log  │
+  └──────┬─────┘ └──────┬─────┘ └──────┬─────┘ └──────┬─────┘
+         │              │              │              │
+         └──────────────┴──────────────┴──────────────┘
+                                 │
+                                 ▼
+  ┌──────────────────────────────────────────────────────────────┐
+  │  FLUENTD (DaemonSet on every K8s node)                       │
+  │  • Collects container logs from /var/log/containers/         │
+  │  • Parses JSON, adds metadata (pod, namespace, node)         │
+  │  • Filters PII / secrets before forwarding                  │
+  │  • Buffers to disk if Elasticsearch unavailable             │
+  └────────────────────────┬─────────────────────────────────────┘
+                           │  forward (port 9200)
+                           ▼
+  ┌──────────────────────────────────────────────────────────────┐
+  │  ELASTICSEARCH (3-node cluster in monitoring namespace)      │
+  │  • Stores and indexes all log data                          │
+  │  • Index pattern: logs-YYYY.MM.DD                           │
+  │  • Retention: 30 days hot, 90 days warm (ILM policy)        │
+  └────────────────────────┬─────────────────────────────────────┘
+                           │  query / visualise
+                           ▼
+  ┌──────────────────────────────────────────────────────────────┐
+  │  KIBANA (NodePort 5601)                                      │
+  │  • Dashboards: Error trends, slow queries, audit events     │
+  │  • Saved searches: CrashLoopBackOff, OOMKilled, DB errors   │
+  │  • Alerting: Kibana watchers → Slack #ops-alerts            │
+  └──────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Flowchart 3 — Alert Escalation Flowchart (P1 / P2 / P3)
+
+```
+  ALERT FIRED BY ALERTMANAGER
+              │
+  ◆ Severity label?
+  │
+  ├── P1 (critical) ──────────────────────────────────────────┐
+  │                                                           │
+  │  Conditions:                                              │
+  │  • error_rate > 5%  OR  DB down  OR  K8s cluster failure  │
+  │  • SLO burn rate > 14× (1-hour window)                    │
+  │                                                           │
+  │  ① PagerDuty HIGH alert → on-call engineer (immediate)   │
+  │  ② SMS + phone call if not acknowledged in 5 min         │
+  │  ③ Escalate to on-call manager in 15 min                 │
+  │  ④ Incident bridge opened in Slack #p1-incident          │
+  │  ⑤ Status page updated (external)                        │
+  │  RTO: Acknowledge < 5 min │ Mitigate < 30 min            │
+  └───────────────────────────────────────────────────────────┘
+
+  ├── P2 (warning) ───────────────────────────────────────────┐
+  │                                                           │
+  │  Conditions:                                              │
+  │  • error_rate 1–5%  OR  p95 latency > 2× baseline        │
+  │  • Replication lag > 5 s  OR  disk > 80% full            │
+  │  • SLO burn rate > 6× (6-hour window)                    │
+  │                                                           │
+  │  ① Slack #ops-alerts message (on-call pinged)            │
+  │  ② PagerDuty LOW alert (no phone call)                   │
+  │  ③ Acknowledge within 30 min                             │
+  │  ④ Resolve within 4 hours                                │
+  └───────────────────────────────────────────────────────────┘
+
+  └── P3 (info) ──────────────────────────────────────────────┐
+                                                              │
+     Conditions:                                              │
+     • error_rate < 1%  OR  disk > 70%  OR  lag > 1 s        │
+     • Single pod restart  OR  certificate expiry > 30 days   │
+                                                              │
+     ① Slack #ops-info message (no page)                      │
+     ② Track in Grafana dashboard                             │
+     ③ Review at next daily standup                           │
+     └──────────────────────────────────────────────────────┘
+```
+
+---
+
+## Flowchart 4 — SLO Burn Rate Diagram
+
+```
+  SLO DEFINITION:
+  ┌──────────────────────────────────────────────────────────────┐
+  │  Availability SLO: 99.9% uptime (43.2 min downtime/month)   │
+  │  Latency SLO: p95 < 500 ms on /api/* endpoints              │
+  └──────────────────────────────────────────────────────────────┘
+
+  ERROR BUDGET:
+  ┌──────────────────────────────────────────────────────────────┐
+  │  Monthly error budget = 0.1% × 43,200 min = 43.2 min       │
+  │  Daily budget = 43.2 / 30 = 1.44 min/day                   │
+  └──────────────────────────────────────────────────────────────┘
+
+  BURN RATE WINDOWS & THRESHOLDS:
+  ════════════════════════════════════════════════════════
+
+  BUDGET LEFT  100% ┤████████████████████████████████████
+                    │
+                80% ┤████████████████████████████
+                    │                            ← Normal operations zone
+                60% ┤████████████████████
+                    │
+                40% ┤████████████                ← P3 alert (slow burn)
+                    │
+                20% ┤████████                    ← P2 alert (medium burn)
+                    │
+                 5% ┤███                         ← P1 alert (fast burn)
+                    │
+                 0% ┤                            ← SLO VIOLATED
+                    └────────────────────────────────────────────▶ TIME
+
+  BURN RATE ALERT RULES:
+  ┌──────────────────────────────────────────────────────────────┐
+  │  Fast burn (P1):  burn_rate > 14×  over  1h + 5m windows   │
+  │  Medium burn (P2):burn_rate > 6×   over  6h + 30m windows  │
+  │  Slow burn (P3):  burn_rate > 3×   over 24h + 6h  windows  │
+  └──────────────────────────────────────────────────────────────┘
+
+  EXAMPLE — Incident burns budget at 14×:
+  1 hour at 14× burn → uses 14/720 = 1.9% of monthly budget
+  If sustained 3 hrs → 5.8% budget gone → P1 must be resolved
+```
+
+---
+
 ## Table of Contents
 1. [Prometheus Configuration](#prometheus-configuration)
 2. [Grafana Dashboards](#grafana-dashboards)

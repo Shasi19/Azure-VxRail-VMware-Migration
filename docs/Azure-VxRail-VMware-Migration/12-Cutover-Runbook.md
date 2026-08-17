@@ -10,6 +10,205 @@
 15:30 Prep ──▶ 16:00 Freeze ──▶ 16:30 Final Sync ──▶ 17:00 DNS Switch ──▶ Validate ──▶ Hypercare
 ```
 
+---
+
+## Flowchart 1 — Full Cutover Timeline (T+00:00 to T+12:00)
+
+```
+  T-00:30 (15:30)  FINAL PREPARATION
+  ┌──────────────────────────────────────────────────────────────┐
+  │  ① Notify all stakeholders (email + Slack #cutover-prod)    │
+  │  ② Verify on-prem health: kubectl get nodes, patronictl list │
+  │  ③ Document baseline: p95 latency, error rate, DB conns      │
+  │  ④ Pre-stage DNS change commands (ready but NOT executed)    │
+  │  ⑤ War room bridge open, all team members confirmed          │
+  └────────────────────────┬─────────────────────────────────────┘
+                           │
+                  ◆ All pre-flight checks pass?
+                  ├── NO ──▶ STOP — do not proceed — escalate
+                  YES
+                           ▼
+  T+00:00 (16:00)  WRITE FREEZE
+  ┌──────────────────────────────────────────────────────────────┐
+  │  ⑥ Set Azure PROD DB to read-only:                          │
+  │     ALTER DATABASE prod SET default_transaction_read_only    │
+  │     = on;                                                    │
+  │  ⑦ Confirm Azure app write traffic drops to 0               │
+  └────────────────────────┬─────────────────────────────────────┘
+                           │
+  T+00:15 (16:15)  FINAL REPLICATION SYNC
+  ┌──────────────────────────────────────────────────────────────┐
+  │  ⑧ Monitor pglogical lag:                                   │
+  │     SELECT now() - pg_last_xact_replay_timestamp() AS lag;  │
+  │  ⑨ Wait for lag to reach 0 ms                               │
+  └────────────────────────┬─────────────────────────────────────┘
+                           │
+                  ◆ Lag = 0 ms?
+                  ├── NO (> 5 min wait) ──▶ Go/No-go decision
+                  YES
+                           ▼
+  T+00:30 (16:30)  DROP SUBSCRIPTION — ON-PREM BECOMES PRIMARY
+  ┌──────────────────────────────────────────────────────────────┐
+  │  ⑩ Drop pglogical subscription:                             │
+  │     SELECT pglogical.drop_subscription('onprem_sub');        │
+  │  ⑪ On-prem DB promoted to read-write primary               │
+  │  ⑫ Confirm: psql -c "SHOW transaction_read_only;" → "off"  │
+  └────────────────────────┬─────────────────────────────────────┘
+                           │
+  T+00:45 (16:45)  DNS CUTOVER
+  ┌──────────────────────────────────────────────────────────────┐
+  │  ⑬ Flip external DNS:                                       │
+  │     api.company.com → 10.52.100.10 (on-prem MetalLB VIP)   │
+  │  ⑭ Flip internal DNS (Bind9 zone file update + rndc reload) │
+  │  ⑮ Wait 60 s (TTL) then verify:                             │
+  │     dig api.company.com +short → 10.52.100.10               │
+  └────────────────────────┬─────────────────────────────────────┘
+                           │
+  T+01:00 (17:00)  RESTART APPLICATIONS TO PICK UP NEW DB
+  ┌──────────────────────────────────────────────────────────────┐
+  │  ⑯ kubectl rollout restart deployment/api-gateway -n prod   │
+  │  ⑰ kubectl rollout restart deployment --all -n prod         │
+  │  ⑱ Wait for all pods Running: kubectl get pods -n prod -w   │
+  └────────────────────────┬─────────────────────────────────────┘
+                           │
+  T+01:30 (17:30)  POST-CUTOVER VALIDATION
+  ┌──────────────────────────────────────────────────────────────┐
+  │  ⑲ Health check: curl https://api.company.com/health        │
+  │  ⑳ Smoke tests: run automated test suite                    │
+  │  ㉑ Error rate < 0.1% in Grafana?                           │
+  │  ㉒ p95 latency ≤ baseline in Prometheus?                   │
+  └────────────────────────┬─────────────────────────────────────┘
+                           │
+                  ◆ All validation checks pass?
+                  ├── NO ──▶ EMERGENCY ROLLBACK (see flowchart 4)
+                  YES
+                           ▼
+  T+02:00 (18:00)  DECLARE CUTOVER SUCCESS
+  ┌──────────────────────────────────────────────────────────────┐
+  │  ㉓ Notify: "PROD cutover successful — on-prem is live"     │
+  │  ㉔ Begin 24-hour hypercare monitoring window               │
+  └────────────────────────┬─────────────────────────────────────┘
+                           │
+  T+12:00 (04:00 Sat)  HYPERCARE ENDS / AZURE DECOMMISSION BEGINS
+  ┌──────────────────────────────────────────────────────────────┐
+  │  ㉕ Confirm 12-hr metrics are nominal                       │
+  │  ㉖ Schedule Azure resource cleanup (72-hr hold first)      │
+  └──────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Flowchart 2 — Go / No-Go Decision Tree
+
+```
+  PRE-CUTOVER GO/NO-GO (T-00:30)
+  ═══════════════════════════════
+
+               ◆ Is pglogical lag < 50 ms (sustained 7 days)?
+               ├── NO  ──▶  NO-GO: Fix replication first
+               YES
+               │
+               ◆ Are all on-prem K8s nodes Ready?
+               ├── NO  ──▶  NO-GO: Drain/fix affected nodes
+               YES
+               │
+               ◆ Is Patroni cluster healthy (1 primary + 2 replicas)?
+               ├── NO  ──▶  NO-GO: Resolve Patroni fencing issue
+               YES
+               │
+               ◆ Have rollback procedures been tested this week?
+               ├── NO  ──▶  NO-GO: Run rollback drill first
+               YES
+               │
+               ◆ Are all team members confirmed on bridge?
+               ├── NO  ──▶  DELAY: Wait for quorum (10 min max)
+               YES
+               │
+               ◆ Is change window still within approved hours (16:00–20:00)?
+               ├── NO  ──▶  NO-GO: Reschedule
+               YES
+               │
+               ▼
+         ✅ GO — Proceed with cutover
+```
+
+---
+
+## Flowchart 3 — Post-Cutover Validation Flow
+
+```
+  T+01:30  BEGIN VALIDATION SUITE
+                │
+  ① Infrastructure layer
+  ┌──────────────────────────────────────────────────────────┐
+  │  kubectl get nodes       → all Ready                    │
+  │  patronictl list         → 1 Leader, 2 Replica          │
+  │  df -h /data             → > 20% free space             │
+  └────────────────────────┬─────────────────────────────────┘
+                           │
+  ② Database layer
+  ┌──────────────────────────────────────────────────────────┐
+  │  SELECT count(*) FROM <critical_table>  (compare Azure) │
+  │  SHOW transaction_read_only;  → "off"                   │
+  │  Check pg_stat_replication for streaming replicas       │
+  └────────────────────────┬─────────────────────────────────┘
+                           │
+  ③ Application layer
+  ┌──────────────────────────────────────────────────────────┐
+  │  curl https://api.company.com/health    → {"status":"ok"}│
+  │  curl https://api.company.com/readiness → 200            │
+  │  Check all 25 microservices Running in prod namespace    │
+  └────────────────────────┬─────────────────────────────────┘
+                           │
+  ④ Observability layer
+  ┌──────────────────────────────────────────────────────────┐
+  │  Grafana: error rate < 0.1% (5-min window)              │
+  │  Prometheus: p95 latency ≤ pre-cutover baseline + 10%   │
+  │  Kibana: no ERROR logs from application pods             │
+  └────────────────────────┬─────────────────────────────────┘
+                           │
+                  ◆ All 4 layers pass?
+                  ├── ANY FAIL ──▶ Emergency rollback decision
+                  ALL PASS
+                           │
+                           ▼
+                  ✅ Post-cutover validation PASSED
+```
+
+---
+
+## Flowchart 4 — Emergency Rollback Trigger
+
+```
+              ⚠  ANOMALY DETECTED POST-CUTOVER
+                             │
+  ◆ Within first 2 hours of cutover?
+  │
+  ├── YES ──▶ ◆ Severity?
+  │            │
+  │     CRITICAL / HIGH ──▶ IMMEDIATE ROLLBACK
+  │            │            (see 09-Rollback-Procedures.md
+  │            │             PROD Rollback Flow)
+  │          MEDIUM ──▶ Team vote (5-min window)
+  │            │        ├── ROLLBACK → execute
+  │            │        └── CONTINUE → add monitoring
+  │           LOW ──▶ Continue + document
+  │
+  └── NO (> 2 hrs) ──▶ ◆ Can fix forward?
+                        ├── YES ──▶ Fix in place, document
+                        └── NO  ──▶ Rollback decision:
+                                    consult leadership
+
+  ROLLBACK TRIGGERS (auto-escalate, no vote needed):
+  ┌──────────────────────────────────────────────────────────┐
+  │  • Database error rate > 5% for > 2 minutes              │
+  │  • Data inconsistency detected                           │
+  │  • > 50% of prod pods in CrashLoopBackOff               │
+  │  • p99 latency > 3× baseline for > 5 minutes            │
+  │  • pglogical subscriber showing row divergence           │
+  └──────────────────────────────────────────────────────────┘
+```
+
 
 ## Cutover Window: Friday 16:00 - Saturday 16:00 (24 hours)
 

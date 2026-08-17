@@ -4,6 +4,126 @@
 
 ---
 
+## Flowchart 1 — Master Troubleshooting Decision Tree
+
+```
+                        ⚠  PROBLEM REPORTED
+                                  │
+              ◆ What is the PRIMARY symptom?
+              │
+  ┌───────────┬───────────┬───────────┬───────────┬───────────┐
+  ▼           ▼           ▼           ▼           ▼           ▼
+Pods        DB errors   Network     Storage     Backup      Performance
+crash /     / data       connectivity PVC errors  failures    degraded
+CrashLoop   loss         issues                              / slow
+  │           │           │           │           │           │
+  ▼           ▼           ▼           ▼           ▼           ▼
+Section 4   Section 6   Section 2   Section 4   Section 10  Sections
+(K8s)       (PostgreSQL) (Networking)(K8s: PVC)  (Veeam)    4 + 6
+Section 8   Section 7               Section 1   Section 5
+(App)       (MongoDB)               (vSphere)   (Harbor)
+
+  ┌──────────────────────────────────────────────────────────────┐
+  │  QUICK NAVIGATION:                                           │
+  │  § 1  — vSphere / VxRail errors (vSAN, VM creation)         │
+  │  § 2  — Networking (VLAN, MetalLB, VIP, firewall)           │
+  │  § 3  — Oracle Linux 9 VMs (boot, cloud-init, SELinux)      │
+  │  § 4  — Kubernetes (kubeadm, CNI, CSI, nodes)               │
+  │  § 5  — Harbor Registry (push, cert, auth)                  │
+  │  § 6  — PostgreSQL migration (pg_dump, pglogical)           │
+  │  § 7  — MongoDB migration (mongodump, replica, auth)        │
+  │  § 8  — Application deployment (pod crash, image, PVC)      │
+  │  § 9  — DNS Cutover (propagation, stale cache)              │
+  │  § 10 — Veeam Backup (snapshot, agent, K10)                 │
+  │  § 11 — Azure VPN (tunnel, routing)                         │
+  │  § 12 — Patching (kernel, K8s, DB upgrade)                  │
+  └──────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Flowchart 2 — "Is It the DB, K8s, Network, or Storage?" Decision Tree
+
+```
+              APP IS NOT WORKING — WHERE IS THE FAULT?
+                               │
+  ① Check pod status
+  ┌──────────────────────────────────────────────────────────┐
+  │  kubectl get pods -n prod                               │
+  └────────────────────────┬─────────────────────────────────┘
+                           │
+              ◆ Pod status?
+              │
+  ┌───────────┬─────────────┬────────────┬──────────────────┐
+  ▼           ▼             ▼            ▼                  ▼
+Running     CrashLoop    Pending      OOMKilled          Error /
+  │         BackOff        │            │                ImagePull
+  │           │            │            │                  │
+  │           ▼            │            ▼                  ▼
+  │      ② Check logs   ③ Why       ④ App using        → § 5
+  │      kubectl logs    Pending?     too much RAM        Harbor
+  │      <pod> -n prod      │         → tune resources
+  │           │          ◆ Node?
+  │      ◆ Error type?      │
+  │           │          ┌──┴──┐
+  │     DB connect?    Yes    No
+  │           │          │     │
+  │          YES         ▼     ▼
+  │           │       Node  Insufficient
+  │           ▼       NotReady  capacity
+  │      → FAULT: DB  → § 4    → § 1
+  │        Go to § 6  K8s      vSphere
+  │
+  ▼
+② App is Running — check connectivity
+  ┌──────────────────────────────────────────────────────────┐
+  │  curl -sk https://api.company.com/health                │
+  └────────────────────────┬─────────────────────────────────┘
+                           │
+              ◆ Response?
+              │
+  ┌───────────┬─────────────┬────────────┐
+  ▼           ▼             ▼            ▼
+200 OK     502/503       Timeout      DNS NXDOMAIN
+  │        (gateway)       │            │
+  │           │            ▼            ▼
+  │      → FAULT:      → FAULT:    → FAULT:
+  │        K8s Service   Network     DNS
+  │        / Ingress     NSG/FW      Go to § 9
+  │        Go to § 4     Go to § 2
+  │
+  ▼
+③ App is reachable — check DB
+  ┌──────────────────────────────────────────────────────────┐
+  │  psql -h <db-host> -U postgres -c "SELECT 1;"           │
+  └────────────────────────┬─────────────────────────────────┘
+                           │
+              ◆ Response?
+              │
+  ┌───────────┬─────────────┬────────────┐
+  ▼           ▼             ▼            ▼
+SELECT 1    Connection    Auth failed  Patroni
+  → DB OK   refused        → § 6       leader
+            → § 2 (port    pg_hba      election
+            blocked?) or   issue       → § 4/§ 6
+            § 6 (Patroni               wait for
+            crashed)                   new primary
+
+  ④ DB and K8s OK — check storage
+  ┌──────────────────────────────────────────────────────────┐
+  │  kubectl get pvc -n prod                                │
+  │  df -h  (on DB node)                                    │
+  └────────────────────────┬─────────────────────────────────┘
+                           │
+              ◆ PVC status?
+              ├── Pending/Lost  ──▶  § 4 (CSI / vSAN issue)
+              ├── Disk > 95%    ──▶  § 1 (expand vSAN or PVC)
+              └── All Bound     ──▶  Fault not storage
+                                     → escalate to SME
+```
+
+---
+
 ## Troubleshooting Decision Trees
 
 ```

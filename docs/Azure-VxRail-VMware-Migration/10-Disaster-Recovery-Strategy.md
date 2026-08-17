@@ -22,6 +22,185 @@
   Fail over to DR workflow
 ```
 
+---
+
+## Flowchart 1 — DR Architecture Topology
+
+```
+╔══════════════════════════════════════════════════════════════════╗
+║                PRIMARY SITE — VxRail On-Premises                ║
+║                                                                  ║
+║  ┌────────────────────────────────────────────────────────────┐ ║
+║  │  VxRail Cluster (6 nodes)  |  vSAN datastore               │ ║
+║  │                                                            │ ║
+║  │  ┌──────────────┐  ┌──────────────┐  ┌────────────────┐  │ ║
+║  │  │  K8s Cluster │  │  PostgreSQL  │  │  Harbor        │  │ ║
+║  │  │  (3 masters  │  │  Patroni HA  │  │  Registry      │  │ ║
+║  │  │  + 6 workers)│  │  Primary +   │  │  vxrail-       │  │ ║
+║  │  │              │  │  2 replicas  │  │  harbor.local  │  │ ║
+║  │  └──────────────┘  └──────────────┘  └────────────────┘  │ ║
+║  │                                                            │ ║
+║  │  ┌──────────────────────────────────────────────────────┐ │ ║
+║  │  │  Veeam B&R v12.1                                     │ │ ║
+║  │  │  Daily VM snapshots → NAS Repository                 │ │ ║
+║  │  │  PostgreSQL WAL → continuous archiving               │ │ ║
+║  │  └──────────────────────────────────────────────────────┘ │ ║
+║  └────────────────────────────────────────────────────────────┘ ║
+║                           │                                      ║
+║           ┌───────────────┼───────────────────┐                 ║
+║           │               │                   │                 ║
+║           ▼               ▼                   ▼                 ║
+║  Replication          WAL archive         VM snapshots          ║
+║  (pglogical /         to S3/NAS           to Veeam repo         ║
+║   streaming)                                                     ║
+╚═══════════════════════════╪══════════════════════════════════════╝
+                            │  WAN / VPN (IPSec)
+╔═══════════════════════════▼══════════════════════════════════════╗
+║              DR SITE — Azure (Cold / Warm Standby)              ║
+║                                                                  ║
+║  ┌────────────────────────────────────────────────────────────┐ ║
+║  │  Azure Blob Storage                                        │ ║
+║  │  • Veeam backup copies (encrypted, 30-day retention)       │ ║
+║  │  • PostgreSQL WAL archives (7-day PITR window)             │ ║
+║  │  • K8s manifests + Helm charts (Git-synced)                │ ║
+║  └────────────────────────────────────────────────────────────┘ ║
+║                                                                  ║
+║  ┌──────────────────────────────┐  ┌──────────────────────────┐ ║
+║  │  Azure VMs (warm standby)    │  │  Azure AKS (cold standby)│ ║
+║  │  Restore Veeam → Azure VM    │  │  Redeploy from manifests │ ║
+║  │  RTO: 2-4 hours              │  │  RTO: 4-6 hours          │ ║
+║  └──────────────────────────────┘  └──────────────────────────┘ ║
+╚══════════════════════════════════════════════════════════════════╝
+```
+
+---
+
+## Flowchart 2 — RTO / RPO Target Visualisation
+
+```
+  TIME AXIS (hours from incident):
+  ────────────────────────────────────────────────────────────────▶
+  0h        1h        2h        4h        6h       12h       24h
+
+  POSTGRESQL DATABASE:
+  RPO: ◀══════ 1 hour of data at risk (WAL archiving) ══════▶
+  RTO: ◀═══════════════ 2 hours to restore ════════════════▶
+       │               │
+       Incident        DB back online
+
+  K8s WORKLOADS:
+  RPO: ◀═══════════════ 24 hours (daily snapshot) ════════════════▶
+  RTO: ◀════════════════════════ 4 hours to rebuild ══════════════▶
+       │                         │
+       Incident                  Apps back online
+
+  FILE STORAGE:
+  RPO: ◀═══════════════════════ 24 hours ══════════════════════════▶
+  RTO: ◀════════════════════════════════════════════ 24 hours ══════▶
+
+  CONFIGURATION (Git):
+  RPO: ◀ near-zero (Git push every change)
+  RTO: ◀ 1 hour │
+       Incident  Re-apply manifests
+
+  PRIORITY TIERS:
+  ╔═══════════════════════════════════════════════════════════╗
+  ║  P1 (0–2h):  PostgreSQL + API Gateway + Auth Service     ║
+  ║  P2 (0–4h):  All microservices + Redis + RabbitMQ        ║
+  ║  P3 (0–24h): Dev environments + archive data + logs      ║
+  ╚═══════════════════════════════════════════════════════════╝
+```
+
+---
+
+## Flowchart 3 — Failover Decision: Which Recovery Path?
+
+```
+                          ⚠  FAILURE DETECTED
+                                   │
+           ┌───────────────────────┼────────────────────────┐
+           ▼                       ▼                        ▼
+   ◆ What failed?           ◆ Severity?              ◆ Duration?
+           │                       │                        │
+  ┌────────┴────────┐     CRITICAL / HIGH          > RTO threshold?
+  │                 │               │                        │
+  ▼                 ▼               ▼                    YES / NO
+INFRA             DATA           SERVICE
+(hardware/        (DB corrupt /  (K8s pods /
+ network)          data loss)     app errors)
+
+  │                 │               │
+  ▼                 ▼               ▼
+◆ Recoverable     ◆ WAL restore   ◆ Pod restart /
+  locally?          possible?       node drain?
+  │                 │               │
+ YES  NO           YES  NO         YES  NO
+  │    │            │    │          │    │
+  ▼    ▼            ▼    ▼          ▼    ▼
+Fix  Trigger     PITR  Restore   Restart Fail over
+in   site        restore from   pod     to DR
+place failover   archive   Veeam         site
+
+  RECOVERY PATHS:
+  ┌────────────────────────────────────────────────────────────┐
+  │ PATH A — Local fix (RTO < 30 min):                        │
+  │   Restart service, reschedule pod, fix config             │
+  ├────────────────────────────────────────────────────────────┤
+  │ PATH B — PITR restore (RTO 1-2 hrs):                      │
+  │   pg_basebackup + WAL replay to point-in-time             │
+  ├────────────────────────────────────────────────────────────┤
+  │ PATH C — Veeam VM restore (RTO 2-4 hrs):                  │
+  │   Restore VM from last good snapshot (local or Azure)     │
+  ├────────────────────────────────────────────────────────────┤
+  │ PATH D — Full DR failover (RTO 4-6 hrs):                  │
+  │   Activate Azure standby VMs + AKS, restore DB,           │
+  │   redirect DNS to Azure endpoints                         │
+  └────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Flowchart 4 — Backup Schedule Timeline
+
+```
+  DAILY SCHEDULE (24-hour view):
+  ════════════════════════════════════════════════════════════════
+
+  00:00 ┤ ① PostgreSQL pg_basebackup (full base backup — weekly Sun)
+        │
+  01:00 ┤ ② Veeam VM backup job starts
+        │   • K8s master VMs (all 3)
+        │   • DB VMs (patroni-1, patroni-2, patroni-3)
+        │   • Harbor VM
+        │   Retention: 7 daily + 4 weekly + 12 monthly
+        │
+  03:00 ┤ ③ Veeam backup completes (expected ~2 hrs)
+        │   ◆ Success? → Verify checksum → OK
+        │             → FAIL → Alert on-call + retry
+        │
+  04:00 ┤ ④ Veeam copy job: replicate backup to Azure Blob Storage
+        │
+  06:00 ┤ ⑤ PostgreSQL WAL archive check
+        │   • WAL segments streaming continuously → NAS
+        │   • Confirm last_archived_wal updated
+        │
+  12:00 ┤ ⑥ Midday: Veeam SureBackup (automated restore test)
+        │   • Spin up recovered VM in isolated vLAN
+        │   • Boot test + heartbeat check
+        │   • Report: PASS / FAIL
+        │
+  18:00 ┤ ⑦ Incremental Veeam backup (application VMs only)
+        │
+  23:00 ┤ ⑧ Retention cleanup: purge expired restore points
+
+  PITR WINDOW:
+  ┌─────────────────────────────────────────────────────┐
+  │  WAL archives retained: 7 days                     │
+  │  Can restore to any second within last 7 days      │
+  │  pg_basebackup weekly + continuous WAL = full PITR │
+  └─────────────────────────────────────────────────────┘
+```
+
 
 ## Table of Contents
 1. [DR Objectives](#dr-objectives)

@@ -183,62 +183,120 @@ vSAN Configuration:
 
 ### Virtual Machine Specifications
 
-#### Kubernetes Master Nodes (3 VMs)
+#### Kubernetes Master Nodes (3 VMs — shared across all environments)
 
 ```
 VM Configuration (per master node):
-├── CPU: 8 vCPUs
-├── Memory: 32 GB RAM
-├── Storage: 100 GB (thin provisioned, vSAN backed)
-├── Network: 2x vNICs (1 for cluster, 1 for storage)
-├── OS: Oracle Linux 9 minimal
-├── Kernel: 5.15+ (OL9 provided)
-└── Container Runtime: containerd
+├── CPU:     8 vCPUs  (+25% buffer vs minimum 4 vCPU)
+├── Memory:  32 GB RAM (+60% buffer vs minimum 16 GB; handles etcd + API server growth)
+├── Storage: 150 GB   (OS 50 GB + etcd 50 GB + logs/buffers 50 GB — thin provisioned)
+├── Network: 2x vNICs (VMXNET3; 1 cluster/pod network, 1 storage/vSAN)
+├── OS:      Oracle Linux 9 (minimal install)
+└── Runtime: containerd 1.7+
 
-Deployment:
-├── VM Name: k8s-qa-master-01, k8s-qa-master-02, etc.
-├── VM Location: Spread across VxRail nodes (anti-affinity)
-├── vCenter Folder: /VxRail/Kubernetes/Masters
-├── Datastore: vsan-datastore
-├── Network VLAN: 100 (QA), 110 (PREPROD), 120 (PROD)
-└── HA Restartability: Enabled (restart priority: high)
+WHY these master specs:
+  - 8 vCPUs: API server, scheduler, controller-manager all run here; 8 leaves headroom
+    for bursts and future K8s upgrades adding new controllers
+  - 32 GB RAM: etcd alone uses 2–4 GB; API server 4–8 GB; 32 GB gives 50%+ free buffer
+    for unexpected load (e.g., large kubectl list operations, admission webhooks)
+  - 150 GB disk: etcd data grows ~1 GB/month; logs accumulate; 150 GB = 3+ years buffer
 
-Storage Policy:
-├── RAID Configuration: vSAN RAID-1
-├── Failure Tolerance: 1 node
-├── Stripe Width: 1
-├── Cache Reservation: 25%
-└── Thin Provisioning: Enabled
+Static IPs:
+  k8s-master-01: 10.50.0.10 (QA) / 10.51.0.10 (PREPROD) / 10.52.0.10 (PROD)
+  k8s-master-02: 10.50.0.11 (QA) / 10.51.0.11 (PREPROD) / 10.52.0.11 (PROD)
+  k8s-master-03: 10.50.0.12 (QA) / 10.51.0.12 (PREPROD) / 10.52.0.12 (PROD)
+  VIP (HAProxy): 10.50.0.100 (QA) / 10.51.0.100 (PREPROD) / 10.52.0.100 (PROD)
+
+HA:
+  ├── Anti-affinity rule: each master on a different VxRail physical host
+  ├── vSphere HA: restart priority = HIGH
+  ├── kubeadm HA: stacked etcd (etcd co-located with master)
+  └── HAProxy VIP: routes kubectl + API traffic to any healthy master
 ```
 
-#### Kubernetes Worker Nodes (15 VMs total)
+#### Kubernetes Worker Nodes — Sizing with Buffer
 
 ```
-VM Configuration (per worker node):
-├── CPU: 8 vCPUs
-├── Memory: 32 GB RAM
-├── Storage: 100 GB (thin provisioned, vSAN backed)
-├── Network: 2x vNICs
-├── OS: Oracle Linux 9 minimal
-└── Container Runtime: containerd
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│                   WORKER NODE VM SIZING (with growth buffer)                     │
+├──────────────┬────────────┬───────────┬──────────────┬────────────────────────── │
+│ Environment  │ Count      │ vCPU      │ RAM          │ Storage (vSAN thin prov.) │
+├──────────────┼────────────┼───────────┼──────────────┼─────────────────────────  │
+│ QA           │ 3 workers  │ 12 vCPU   │ 48 GB        │ 200 GB per node           │
+│              │            │ (+50% buf)│ (+50% buf)   │ (+100% vs 100GB baseline) │
+├──────────────┼────────────┼───────────┼──────────────┼─────────────────────────  │
+│ PREPROD      │ 9 workers  │ 16 vCPU   │ 64 GB        │ 250 GB per node           │
+│              │            │ (+100% vs │ (+100% buf)  │ (+150% vs baseline)       │
+│              │            │  QA min.) │              │                           │
+├──────────────┼────────────┼───────────┼──────────────┼─────────────────────────  │
+│ PROD         │ 12 workers │ 24 vCPU   │ 96 GB        │ 300 GB per node           │
+│              │            │ (+50% vs  │ (+50% vs     │ (persistent vol headroom) │
+│              │            │  PREPROD) │  PREPROD)    │                           │
+└──────────────┴────────────┴───────────┴──────────────┴─────────────────────────  ┘
 
-QA Worker Nodes (3 VMs):
-├── VM Names: k8s-qa-worker-01, k8s-qa-worker-02, k8s-qa-worker-03
-├── VLAN: 100
-├── Resource Pool: QA-ResourcePool (10 vCPU, 40 GB RAM reservation)
-└── Storage Allocation: 50 GB per node
+WHY these worker specs:
+  QA (12vCPU / 48GB / 200GB):
+  - 12 vCPU: runs ~10-15 pods; 12 vCPU allows pod bursts without OOMKiller
+  - 48 GB: each Java pod = 1-2 GB; Node.js = 200-500 MB; 48 GB = room for 30+ pods
+  - 200 GB: PersistentVolumes, image layers, emptyDir, logs; 200 GB = 2yr+ headroom
 
-PREPROD Worker Nodes (9 VMs):
-├── VM Names: k8s-preprod-worker-01 to k8s-preprod-worker-09
-├── VLAN: 110
-├── Resource Pool: PREPROD-ResourcePool (48 vCPU, 192 GB RAM reservation)
-└── Storage Allocation: 50 GB per node
+  PREPROD (16vCPU / 64GB / 250GB):
+  - Matches production sizing more closely → performance tests are representative
+  - 64 GB handles 3K concurrent-user load without memory pressure
+  - 250 GB: more PVs, larger database staging areas
 
-PROD Worker Nodes (12 VMs):
-├── VM Names: k8s-prod-worker-01 to k8s-prod-worker-12
-├── VLAN: 120
-├── Resource Pool: PROD-ResourcePool (96 vCPU, 384 GB RAM reservation)
-└── Storage Allocation: 50 GB per node
+  PROD (24vCPU / 96GB / 300GB):
+  - 30% OVER current load as headroom for traffic growth
+  - 96 GB: peak load + 40% = ~67 GB; 96 GB = 40%+ buffer before needing new nodes
+  - 300 GB: accommodates future StatefulSet PVs, log volumes, growing datasets
+
+Total New VM Footprint:
+  ├── QA:      3W × (12vCPU, 48GB, 200GB) + 3M × (8vCPU, 32GB, 150GB)
+  │            = 60 vCPU, 240 GB RAM, 1.05 TB storage
+  ├── PREPROD: 9W × (16vCPU, 64GB, 250GB) + 3M × (8vCPU, 32GB, 150GB)
+  │            = 168 vCPU, 672 GB RAM, 2.7 TB storage
+  └── PROD:    12W × (24vCPU, 96GB, 300GB) + 3M × (8vCPU, 32GB, 150GB)
+               = 312 vCPU, 1,248 GB RAM, 4.05 TB storage
+
+  Grand Total VMs: 30 VMs
+  Grand Total: ~540 vCPU | ~2.1 TB RAM | ~7.8 TB storage
+  Available on VxRail: 721.75 GHz free | 1.38 TB RAM free | 90.86 TB storage free
+  ⚠️  Memory: Plan in phases — 2.1 TB > 1.38 TB free
+     Mitigation: Migrate QA first, validate, then PREPROD, then PROD.
+                 Each phase decommissions Azure = releases cost, not capacity.
+                 Memory is the constraint to monitor.
+```
+
+#### PostgreSQL Database Node Sizing
+
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                 DATABASE VM SIZING (3 nodes per environment)                 │
+├──────────────┬────────────┬─────────────────┬──────────────────────────────  │
+│ Environment  │ Count      │ vCPU / RAM      │ Storage                       │
+├──────────────┼────────────┼─────────────────┼──────────────────────────────  │
+│ QA (single)  │ 1 VM       │ 8 vCPU / 32 GB  │ 500 GB data + 100 GB OS/log  │
+│              │            │                 │ = 600 GB total                │
+├──────────────┼────────────┼─────────────────┼──────────────────────────────  │
+│ PREPROD HA   │ 3 VMs      │ 16 vCPU / 64 GB │ 500 GB data + 200 GB WAL/log │
+│ (Patroni)    │ per node   │ per node        │ = 700 GB per node             │
+├──────────────┼────────────┼─────────────────┼──────────────────────────────  │
+│ PROD HA      │ 3 VMs      │ 32 vCPU / 128 GB│ 1 TB data + 500 GB WAL/log   │
+│ (Patroni)    │ per node   │ per node        │ = 1.5 TB per node             │
+└──────────────┴────────────┴─────────────────┴──────────────────────────────  ┘
+
+WHY these DB specs:
+  PROD 128GB RAM: shared_buffers = 32 GB (25% of RAM) — PostgreSQL caches most
+  of the working dataset in RAM. Current DB ~650 GB; 128 GB RAM caches hot pages
+  and dramatically reduces disk I/O.
+  
+  PROD 1.5 TB storage: 1 TB data × 1.5x growth buffer = immediate headroom,
+  500 GB WAL = 7+ days of WAL retention for PITR, log shipping, and debugging.
+
+IPs (VLAN 30 — Database network, isolated):
+  QA:      pg-qa-01:       10.30.0.100 (pgBouncer VIP: 10.30.0.50)
+  PREPROD: pg-preprod-01:  10.30.0.110, -02: .111, -03: .112 (VIP: 10.30.0.100)
+  PROD:    pg-prod-01:     10.30.0.120, -02: .121, -03: .122 (VIP: 10.30.0.200)
 ```
 
 ---

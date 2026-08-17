@@ -33,6 +33,201 @@
            └────────────────────────────────┘
 ```
 
+
+---
+
+## Flowchart 1 — Veeam Full Architecture Diagram
+
+```
+╔══════════════════════════════════════════════════════════════════╗
+║               VEEAM BACKUP AND REPLICATION — FULL STACK         ║
+╚══════════════════════════════════════════════════════════════════╝
+
+  ┌──────────────────────────────────────────────────────────────┐
+  │  SOURCE VMs (on VxRail vSAN)                                 │
+  │                                                              │
+  │  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌──────────┐ │
+  │  │k8s-master-1│ │k8s-worker-1│ │patroni-db-1│ │harbor-vm │ │
+  │  │k8s-master-2│ │     ...    │ │patroni-db-2│ │          │ │
+  │  │k8s-master-3│ │k8s-worker-6│ │patroni-db-3│ │          │ │
+  │  └──────┬─────┘ └──────┬─────┘ └──────┬─────┘ └────┬─────┘ │
+  └─────────┼──────────────┼──────────────┼─────────────┼───────┘
+            └──────────────┴──────────────┴─────────────┘
+                                   │
+                        VMware APIs (vCenter)
+                                   │
+  ┌────────────────────────────────▼─────────────────────────────┐
+  │  VEEAM BACKUP SERVER  (vxrail-vbr-01)                        │
+  │  Windows Server 2022 │ 8 vCPU │ 16 GB RAM                   │
+  │  ┌──────────────────────────────────────────────────────┐    │
+  │  │  Veeam B&R Console                                   │    │
+  │  │  Job scheduler │ Retention policies │ SureBackup      │    │
+  │  └──────────────────────────────────────────────────────┘    │
+  │                           │                                  │
+  │  ┌──────────────────────────────────────────────────────┐    │
+  │  │  Veeam Proxy (transport role)                        │    │
+  │  │  Direct SAN / HotAdd / NBD transport modes           │    │
+  │  └──────────────────────────────────────────────────────┘    │
+  └────────────────────────────┬─────────────────────────────────┘
+                               │
+              ┌────────────────┼──────────────────┐
+              │                │                  │
+              ▼                ▼                  ▼
+  ┌───────────────────┐ ┌────────────────┐ ┌──────────────────┐
+  │  PRIMARY REPO     │ │  COPY REPO     │ │  KASTEN K10      │
+  │  NAS (NFS mount)  │ │  Azure Blob    │ │  (K8s PV backup) │
+  │  /backup 20 TB    │ │  Storage       │ │  Helm-deployed   │
+  │  7-day retention  │ │  30-day copy   │ │  in k8s cluster  │
+  └───────────────────┘ └────────────────┘ └──────────────────┘
+```
+
+---
+
+## Flowchart 2 — Backup Job Flow (What Gets Backed Up When)
+
+```
+  ┌─────────────────────────────────────────────────────────────┐
+  │                  BACKUP JOB SCHEDULE                        │
+  └────────────────────────────────────────────────────────────┘
+
+  JOB 1: K8s Infrastructure VMs — Daily 01:00
+  ┌──────────────────────────────────────────────────────────┐
+  │  Targets: k8s-master-1/2/3                               │
+  │  Type: VM backup (crash-consistent)                      │
+  │  Schedule: Daily 01:00, incremental (full Sun 00:00)     │
+  │  Retention: 7 daily + 4 weekly + 12 monthly              │
+  │  Estimated size: ~300 GB per full                        │
+  └──────────────────────────────────────────────────────────┘
+
+  JOB 2: PostgreSQL DB VMs — Daily 01:00 (parallel)
+  ┌──────────────────────────────────────────────────────────┐
+  │  Targets: patroni-db-1/2/3                               │
+  │  Type: App-aware (pre/post scripts to flush WAL)         │
+  │  Pre-job script: pg_checkpoint + pg_switch_wal           │
+  │  Post-job script: verify backup integrity                │
+  │  Retention: 14 daily + 8 weekly                          │
+  │  Estimated size: ~500 GB per full (2 TB DB)              │
+  └──────────────────────────────────────────────────────────┘
+
+  JOB 3: Harbor + Services VM — Daily 02:00
+  ┌──────────────────────────────────────────────────────────┐
+  │  Targets: harbor-vm, dns-vm, vbr-vm                      │
+  │  Type: VM backup                                         │
+  │  Retention: 7 daily                                      │
+  └──────────────────────────────────────────────────────────┘
+
+  JOB 4: Kasten K10 — K8s PV Backup — Daily 03:00
+  ┌──────────────────────────────────────────────────────────┐
+  │  Targets: All PVCs in prod/preprod/qa namespaces         │
+  │  Type: K8s-aware (PVC snapshot + app quiesce hooks)      │
+  │  Export: to NAS + Azure Blob                             │
+  │  Retention: 7 daily + 4 weekly                           │
+  └──────────────────────────────────────────────────────────┘
+
+  JOB 5: Off-site copy to Azure — Daily 04:00
+  ┌──────────────────────────────────────────────────────────┐
+  │  Source: Primary NAS repo (jobs 1-3)                     │
+  │  Target: Azure Blob Storage (cool tier)                  │
+  │  Encryption: AES-256 in flight and at rest               │
+  │  Retention: 30 days                                      │
+  └──────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Flowchart 3 — Restore Decision Tree
+
+```
+                    RESTORE REQUEST RECEIVED
+                              │
+              ◆ What needs to be restored?
+              │
+  ┌───────────┬────────────┬────────────┬───────────────┐
+  ▼           ▼            ▼            ▼               ▼
+Full VM    Specific     K8s App /    PostgreSQL     File /
+(disaster) File/Folder  Namespace    DB Point-in-  Folder
+           from VM      (PV data)    Time (PITR)   from VM
+  │           │            │            │               │
+  ▼           ▼            ▼            ▼               ▼
+Veeam       Veeam       Kasten K10   pg_basebackup   Veeam
+Instant     Guest OS    Restore      + WAL replay    File-Level
+VM          File-Level  Namespace    OR              Restore
+Recovery    Restore     or PVC       Veeam App-
+            (item-level)             aware restore
+  │           │            │            │               │
+  ▼           ▼            ▼            ▼               ▼
+RTO: 15min  RTO: 30min  RTO: 1hr    RTO: 1-2hr     RTO: 30min
+(hot-add    (browse VM  (helm +     (WAL replay    (mount VM
+ restore)    backup)     PVC snap)   to timestamp)   as read-only)
+
+  DECISION QUESTIONS:
+  ┌──────────────────────────────────────────────────────────┐
+  │  ① Is data still available on-prem (just corrupted)?    │
+  │     YES → PITR restore (fastest, least invasive)        │
+  │                                                         │
+  │  ② Is the whole VM gone / unbootable?                   │
+  │     YES → Veeam Instant VM Recovery (restore to vSAN)   │
+  │                                                         │
+  │  ③ Is it just a few files/rows missing?                 │
+  │     YES → Veeam Guest File Restore / item-level         │
+  │                                                         │
+  │  ④ Is the K8s application state lost (PVC deleted)?     │
+  │     YES → Kasten K10 namespace restore                  │
+  └──────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Flowchart 4 — Backup Verification Flow
+
+```
+  ① Automated: SureBackup (daily 12:00)
+  ┌──────────────────────────────────────────────────────────┐
+  │  Veeam starts isolated recovery verification lab        │
+  │  Restores most recent backup of each protected VM       │
+  │  Boots recovered VMs in isolated vLAN (no routing out)  │
+  └────────────────────────┬─────────────────────────────────┘
+                           │
+  ② Heartbeat test
+  ┌──────────────────────────────────────────────────────────┐
+  │  Veeam pings restored VM — responds?                    │
+  └────────────────────────┬─────────────────────────────────┘
+                           │
+                  ◆ VM boots & responds?
+                  ├── NO ──▶ Alert on-call + investigate
+                  │          Check vSAN, VM config, disk
+                  YES
+                           │
+  ③ Application test script
+  ┌──────────────────────────────────────────────────────────┐
+  │  For DB VMs: psql -c "SELECT count(*) FROM pg_tables"   │
+  │  For K8s VMs: kubectl get nodes (if recoverable)        │
+  └────────────────────────┬─────────────────────────────────┘
+                           │
+                  ◆ App responds correctly?
+                  ├── NO ──▶ Alert DB admin + Veeam admin
+                  YES
+                           │
+  ④ Tear down isolated lab
+  ┌──────────────────────────────────────────────────────────┐
+  │  Veeam automatically powers off and deletes test VMs    │
+  └────────────────────────┬─────────────────────────────────┘
+                           │
+  ⑤ Log result to Veeam report + email summary
+  ┌──────────────────────────────────────────────────────────┐
+  │  PASS: "All backups verified — <date> <time>"            │
+  │  FAIL: "<VM name> failed heartbeat test — investigate"   │
+  └────────────────────────┬─────────────────────────────────┘
+                           │
+                           ▼
+  ⑥ Monthly: Manual restore drill (full VM to test cluster)
+  ┌──────────────────────────────────────────────────────────┐
+  │  Restore patroni-db-1 to isolated VLAN test cluster     │
+  │  Confirm data integrity (row counts, schema match)       │
+  │  Document RTO achieved vs. target (2 hrs)                │
+  └──────────────────────────────────────────────────────────┘
+```
+
 ---
 
 ## 1. Veeam Backup and Replication Installation

@@ -16,6 +16,133 @@
                                   └─────────────────────┘
 ```
 
+---
+
+## Flowchart 1 — Full Azure Traffic Flow (User to Data)
+
+```
+ ① User / Client
+ ┌───────────────────────────────────────────────────────────────┐
+ │  Browser / Mobile / API Client / VPN User                     │
+ └───────────────────────────────┬───────────────────────────────┘
+                                 │  HTTPS / REST
+                                 ▼
+ ② Azure DNS (Private + Public zones)
+ ┌─────────────────────────────────────────────────────────────┐
+ │  api.company.com  → Azure Public IP                         │
+ │  *.internal.company.com → Private DNS Zone (10.x.x.x)      │
+ └───────────────────────────────┬─────────────────────────────┘
+                                 │
+                                 ▼
+ ③ Azure Application Gateway / Front Door
+ ┌─────────────────────────────────────────────────────────────┐
+ │  SSL termination │ WAF rules │ Health probes                 │
+ │  Routing rules → backend pools per environment              │
+ └────────────┬────────────────────────────┬────────────────────┘
+              │ QA/PREPROD                  │ PROD
+              ▼                             ▼
+ ④ Azure Load Balancer (per AKS cluster)
+ ┌────────────────────────┐    ┌────────────────────────────────┐
+ │  QA  LB (10.20.1.x)   │    │  PROD LB (10.40.1.x)           │
+ └───────────┬────────────┘    └──────────────┬─────────────────┘
+             │                                │
+             ▼                                ▼
+ ⑤ AKS Ingress Controller (nginx)
+ ┌──────────────────────────────────────────────────────────────┐
+ │  Ingress rules → K8s Services → Pods                        │
+ │  ┌──────────────────┐  ┌───────────────────────────────┐    │
+ │  │  api-gateway Pod │  │  microservice Pods (×25)       │    │
+ │  └────────┬─────────┘  └───────────────┬───────────────┘    │
+ └───────────┼──────────────────────────────┼───────────────────┘
+             │                              │
+             ▼                              ▼
+ ⑥ Data Tier
+ ┌────────────────────────┐    ┌────────────────────────────────┐
+ │  Azure DB for          │    │  Azure Cosmos DB               │
+ │  PostgreSQL v13        │    │  (MongoDB API, multi-region)   │
+ │  Primary + Replica     │    │  Collections: sessions, events │
+ └────────────────────────┘    └────────────────────────────────┘
+```
+
+---
+
+## Flowchart 2 — Network Topology (VNet / Subnets / NSG / Peering)
+
+```
+                    ╔══════════════════════════════════════════╗
+                    ║       HUB VNet  (10.0.0.0/16)           ║
+                    ║  ┌──────────────────────────────────┐   ║
+                    ║  │ GatewaySubnet  (10.0.1.0/24)     │   ║
+                    ║  │  Azure VPN GW  │  ExpressRoute   │   ║
+                    ║  └──────────────────────────────────┘   ║
+                    ║  ┌──────────────────────────────────┐   ║
+                    ║  │ AzureFirewallSubnet (10.0.2.0/24)│   ║
+                    ║  │  Azure Firewall (hub filtering)  │   ║
+                    ║  └──────────────────────────────────┘   ║
+                    ║  ┌──────────────────────────────────┐   ║
+                    ║  │ DNSSubnet        (10.0.3.0/24)   │   ║
+                    ║  │  Azure DNS Private Resolver      │   ║
+                    ║  └──────────────────────────────────┘   ║
+                    ╚══════════════╤═══════════════════════════╝
+          VNet Peering             │             VNet Peering
+    ┌─────────────────────────────┼────────────────────────────┐
+    │                             │                            │
+    ▼                             ▼                            ▼
+╔═══════════════╗       ╔═════════════════╗        ╔═══════════════════╗
+║ QA VNet       ║       ║  PREPROD VNet   ║        ║   PROD VNet       ║
+║ 10.20.0.0/16  ║       ║  10.30.0.0/16  ║        ║   10.40.0.0/16    ║
+║               ║       ║                ║        ║                   ║
+║ AKS Subnet    ║       ║ AKS Subnet     ║        ║ AKS Subnet        ║
+║ 10.20.1.0/24  ║       ║ 10.30.1.0/24  ║        ║ 10.40.1.0/24      ║
+║ [NSG: allow   ║       ║ [NSG: allow    ║        ║ [NSG: allow 443,  ║
+║  443,8443]    ║       ║  443,8443]     ║        ║  8443 inbound;    ║
+║               ║       ║                ║        ║  deny all else]   ║
+║ DB Subnet     ║       ║ DB Subnet      ║        ║ DB Subnet         ║
+║ 10.20.2.0/24  ║       ║ 10.30.2.0/24  ║        ║ 10.40.2.0/24      ║
+║ [NSG: allow   ║       ║ [NSG: 5432     ║        ║ [NSG: 5432 from   ║
+║  5432 from    ║       ║  from AKS      ║        ║  AKS subnet only] ║
+║  AKS only]    ║       ║  subnet only]  ║        ║                   ║
+╚═══════════════╝       ╚═════════════════╝        ╚═══════════════════╝
+```
+
+---
+
+## Flowchart 3 — Data Flow: Write Path vs Read Path
+
+```
+  WRITE PATH                                READ PATH
+  ══════════                                ═════════
+
+  Client ──POST──▶ api-gateway              Client ──GET──▶ api-gateway
+         │                                         │
+         ▼                                         ▼
+  api-gateway validates JWT             api-gateway validates JWT
+         │                                         │
+         ▼                                         ▼
+  Route to microservice              Route to microservice
+         │                                         │
+         ▼                               ┌─────────┴─────────┐
+  Write to PRIMARY PostgreSQL            │ Cache hit?        │
+  (10.20/30/40.2.10:5432)                │                   │
+         │                             YES               NO
+         ▼                              │                 │
+  PostgreSQL WAL replication            ▼                 ▼
+  ──────────────────────▶        Return Redis      Query READ
+         │                       cached result     REPLICA
+         ▼                                         (10.x.2.11)
+  Streaming replica                                    │
+  (10.x.2.11) — async                                  ▼
+         │                                     Return to client
+         ▼
+  pglogical subscriber
+  (on-prem target, during
+   migration window)
+         │
+         ▼
+  Confirm write
+  Return 200 to client
+```
+
 
 ## Table of Contents
 1. [Executive Summary](#executive-summary)

@@ -17,6 +17,147 @@
           └────────────── compare, size, migrate ┘
 ```
 
+---
+
+## Flowchart 1 — "Why This Migration" Business Decision
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│               BUSINESS TRIGGER: Azure Cost Review           │
+│               Monthly cloud bill: ~$65,000/month            │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+          ◆ Is existing VxRail hardware underutilised?
+          │
+          ├──NO──▶ ┌──────────────────────────────────┐
+          │        │ Evaluate cloud cost optimisation  │
+          │        │ (Reserved instances, right-size)  │
+          │        └──────────────────────────────────┘
+          │
+          YES
+          │
+          ▼
+          ◆ Is workload latency-sensitive / data-sovereign?
+          │
+          ├──NO──▶ ┌──────────────────────────────────┐
+          │        │ Stay in Azure, add DR              │
+          │        └──────────────────────────────────┘
+          │
+          YES
+          │
+          ▼
+          ◆ Do we control the physical data centre?
+          │
+          ├──NO──▶ ┌──────────────────────────────────┐
+          │        │ Co-lo or managed private cloud     │
+          │        └──────────────────────────────────┘
+          │
+          YES
+          │
+          ▼
+   ┌──────────────────────────────────────────────────────┐
+   │  ✅ DECISION: Migrate to On-Premises VxRail          │
+   │                                                      │
+   │  Cost savings: ~$40K–50K/month                       │
+   │  Full data sovereignty                               │
+   │  Reuse existing VxRail HCI investment                │
+   │  No vendor lock-in for DB / K8s layer                │
+   └──────────────────────────────────────────────────────┘
+```
+
+---
+
+## Flowchart 2 — Azure vs On-Premises Side-by-Side Comparison
+
+```
+┌──────────────────────────────────────┬──────────────────────────────────────┐
+│         ☁  CURRENT: AZURE            │        🏢 TARGET: ON-PREMISES VxRail │
+├──────────────────────────────────────┼──────────────────────────────────────┤
+│                                      │                                      │
+│  COMPUTE                             │  COMPUTE                             │
+│  ┌──────────────────────────────┐    │  ┌──────────────────────────────┐    │
+│  │ AKS (managed control plane)  │    │  │ K8s 1.34 (self-managed)      │    │
+│  │ 3 clusters: QA/PREPROD/PROD  │    │  │ 3 clusters: QA/PREPROD/PROD  │    │
+│  │ 26 nodes total               │    │  │ 6 VxRail nodes (shared)      │    │
+│  └──────────────────────────────┘    │  └──────────────────────────────┘    │
+│                                      │                                      │
+│  DATABASE                            │  DATABASE                            │
+│  ┌──────────────────────────────┐    │  ┌──────────────────────────────┐    │
+│  │ Azure DB for PostgreSQL v13  │    │  │ PostgreSQL 15 + Patroni HA   │    │
+│  │ Managed, auto-backup         │    │  │ 1 primary + 2 replicas       │    │
+│  │ Azure Cosmos DB (Mongo API)  │    │  │ MongoDB Community (self-mgd) │    │
+│  └──────────────────────────────┘    │  └──────────────────────────────┘    │
+│                                      │                                      │
+│  REGISTRY                            │  REGISTRY                            │
+│  ┌──────────────────────────────┐    │  ┌──────────────────────────────┐    │
+│  │ Azure Container Registry     │    │  │ Harbor (self-hosted)          │    │
+│  │ (Premium tier, geo-repl.)    │    │  │ vxrail-harbor.local           │    │
+│  └──────────────────────────────┘    │  └──────────────────────────────┘    │
+│                                      │                                      │
+│  BACKUP                              │  BACKUP                              │
+│  ┌──────────────────────────────┐    │  ┌──────────────────────────────┐    │
+│  │ Veeam → Azure Blob Storage   │    │  │ Veeam B&R v12.1 → NAS/vSAN  │    │
+│  └──────────────────────────────┘    │  └──────────────────────────────┘    │
+│                                      │                                      │
+│  NETWORKING                          │  NETWORKING                          │
+│  ┌──────────────────────────────┐    │  ┌──────────────────────────────┐    │
+│  │ Azure VNet + NSG + LB        │    │  │ VMware DVS + MetalLB + HAProxy│   │
+│  │ Azure DNS Private Zones      │    │  │ Bind9 DNS (internal)          │   │
+│  └──────────────────────────────┘    │  └──────────────────────────────┘    │
+│                                      │                                      │
+│  COST: ~$65,000 / month              │  COST: ~$15,000 / month (capex paid) │
+└──────────────────────────────────────┴──────────────────────────────────────┘
+```
+
+---
+
+## Flowchart 3 — Tool Selection Decision Tree
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│              TOOL SELECTION RATIONALE                           │
+└──────────────────────────────┬──────────────────────────────────┘
+                               │
+         ┌─────────────────────┼─────────────────────┐
+         │                     │                     │
+         ▼                     ▼                     ▼
+   ◆ Which K8s         ◆ Which DB HA         ◆ Which DB repl.
+     version?            solution?             for cutover?
+         │                     │                     │
+    Need latest           Need auto               Need zero
+    stable +              failover +              downtime +
+    VxRail cert.          fencing +               logical
+    (not beta)            etcd quorum             filtering
+         │                     │                     │
+         ▼                     ▼                     ▼
+   ┌───────────┐         ┌───────────┐         ┌───────────┐
+   │ K8s 1.34  │         │  Patroni  │         │ pglogical │
+   │ (stable,  │         │  (DCS via │         │ (logical  │
+   │  VxRail   │         │  etcd,    │         │  repl.,   │
+   │  tested)  │         │  auto-    │         │  table-   │
+   └───────────┘         │  promote) │         │  level    │
+                         └───────────┘         │  filter)  │
+                                               └───────────┘
+         │                     │                     │
+         └─────────────────────┼─────────────────────┘
+                               │
+                               ▼
+                  ◆ Which backup tool?
+                  │
+                  Need VM-consistent +
+                  K8s-aware +
+                  existing licence
+                  │
+                  ▼
+            ┌──────────────┐
+            │  Veeam B&R   │
+            │  v12.1 +     │
+            │  Kasten K10  │
+            │  for K8s PVs │
+            └──────────────┘
+```
+
 
 ## Table of Contents
 

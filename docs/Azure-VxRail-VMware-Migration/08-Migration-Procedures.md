@@ -13,6 +13,208 @@
 └── Backup/DR copy ──▶ physical snapshot
 ```
 
+---
+
+## Flowchart 1 — Migration Strategy Selection Tree
+
+```
+                    START: Choosing Migration Method
+                                  │
+                    ◆ Is downtime acceptable?
+                    │
+          ┌─────YES─┴────NO──────────────────────┐
+          │                                       │
+          ▼                                       ▼
+  ◆ Dataset size?                      pglogical logical replication
+  │                                    (continuous, zero-downtime)
+  ├── < 10 GB ──▶ pg_dump/restore
+  │               (2-4 hrs, low risk)
+  │
+  ├── 10-100 GB ──▶ ◆ Time window available?
+  │                  ├── >4 hrs  ──▶ pg_dump/restore
+  │                  └── <4 hrs  ──▶ pglogical
+  │
+  └── > 100 GB ──▶ Physical snapshot + WAL replay
+                   (or pglogical for large PROD)
+
+
+  MATRIX SUMMARY:
+  ┌─────────────┬──────────────────┬─────────────────────────────┐
+  │  Phase      │  Method          │  Why                        │
+  ├─────────────┼──────────────────┼─────────────────────────────┤
+  │  QA          │  pg_dump/restore │  Simple, fast, low risk     │
+  │  PREPROD     │  pglogical       │  Test zero-downtime path    │
+  │  PROD        │  pglogical       │  Zero downtime required     │
+  │  DR copy     │  Physical snap   │  Point-in-time consistency  │
+  └─────────────┴──────────────────┴─────────────────────────────┘
+```
+
+---
+
+## Flowchart 2 — pg_dump Step-by-Step Flow
+
+```
+  ① Connect to Azure PostgreSQL
+  ┌──────────────────────────────────────────────────────────┐
+  │  psql -h <azure-host> -U <admin> -d postgres             │
+  └────────────────────────┬─────────────────────────────────┘
+                           │
+  ② Set source to read-only (optional)
+  ┌──────────────────────────────────────────────────────────┐
+  │  ALTER DATABASE <db> SET default_transaction_read_only   │
+  │  = on;                                                   │
+  └────────────────────────┬─────────────────────────────────┘
+                           │
+  ③ Run pg_dump
+  ┌──────────────────────────────────────────────────────────┐
+  │  pg_dump -Fc -j 4 -h <azure> -U <user> <db>             │
+  │          -f /backup/<db>.dump                            │
+  └────────────────────────┬─────────────────────────────────┘
+                           │
+                  ◆ Exit code = 0?
+                  ├── NO ──▶ Check pg_dump error log
+                  │          Re-run with -v flag
+                  YES
+                           │
+  ④ Transfer dump to on-prem
+  ┌──────────────────────────────────────────────────────────┐
+  │  rsync -avz --progress /backup/<db>.dump                 │
+  │        onprem-db:/restore/                               │
+  └────────────────────────┬─────────────────────────────────┘
+                           │
+  ⑤ Restore to on-prem PostgreSQL
+  ┌──────────────────────────────────────────────────────────┐
+  │  pg_restore -Fc -j 4 -h localhost -U postgres            │
+  │             -d <db> /restore/<db>.dump                   │
+  └────────────────────────┬─────────────────────────────────┘
+                           │
+                  ◆ Exit code = 0?
+                  ├── NO ──▶ Check errors, fix schema issues
+                  YES
+                           │
+  ⑥ Validate row counts
+  ┌──────────────────────────────────────────────────────────┐
+  │  psql -c "SELECT schemaname, tablename,                  │
+  │            n_live_tup FROM pg_stat_user_tables           │
+  │            ORDER BY n_live_tup DESC;"                    │
+  └────────────────────────┬─────────────────────────────────┘
+                           │
+                  ◆ Counts match Azure?
+                  ├── NO ──▶ Investigate missing rows
+                  YES
+                           │
+                           ▼
+                  ✅ pg_dump migration complete
+```
+
+---
+
+## Flowchart 3 — pglogical Setup Flow
+
+```
+  ① On Azure (Publisher / Provider side)
+  ┌──────────────────────────────────────────────────────────────┐
+  │  CREATE EXTENSION pglogical;                                 │
+  │  SELECT pglogical.create_node('azure_provider',              │
+  │    'host=<azure-host> port=5432 ...');                       │
+  │  SELECT pglogical.create_replication_set('migration_set');   │
+  │  SELECT pglogical.replication_set_add_all_tables(            │
+  │    'migration_set', ARRAY['public']);                        │
+  └──────────────────────────────────────────────────────────────┘
+                           │
+  ② On On-Prem (Subscriber / Receiver side)
+  ┌──────────────────────────────────────────────────────────────┐
+  │  CREATE EXTENSION pglogical;                                 │
+  │  SELECT pglogical.create_node('onprem_subscriber',           │
+  │    'host=10.52.100.10 port=5432 ...');                       │
+  └──────────────────────────────────────────────────────────────┘
+                           │
+  ③ Create Subscription (on-prem subscribes to Azure)
+  ┌──────────────────────────────────────────────────────────────┐
+  │  SELECT pglogical.create_subscription(                       │
+  │    subscription_name := 'onprem_sub',                        │
+  │    provider_dsn := 'host=<azure> ...',                       │
+  │    replication_sets := ARRAY['migration_set']);               │
+  └──────────────────────────────────────────────────────────────┘
+                           │
+  ④ Monitor sync progress
+  ┌──────────────────────────────────────────────────────────────┐
+  │  SELECT * FROM pglogical.show_subscription_status();         │
+  └────────────────────────┬─────────────────────────────────────┘
+                           │
+                  ◆ Status = 'replicating'?
+                  ├── NO ──▶ Check pg_hba, firewall, WAL level
+                  YES
+                           │
+  ⑤ Verify replication lag
+  ┌──────────────────────────────────────────────────────────────┐
+  │  SELECT now() - pg_last_xact_replay_timestamp() AS lag;      │
+  └────────────────────────┬─────────────────────────────────────┘
+                           │
+                  ◆ Lag < 1 second?
+                  ├── NO ──▶ Investigate network / write load
+                  YES
+                           │
+  ⑥ CUTOVER: drop subscription, promote on-prem as primary
+  ┌──────────────────────────────────────────────────────────────┐
+  │  SELECT pglogical.drop_subscription('onprem_sub');           │
+  │  -- On-prem is now authoritative write target                │
+  └──────────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+                  ✅ pglogical cutover complete
+```
+
+---
+
+## Flowchart 4 — Data Validation Flow
+
+```
+  ① Schema validation
+  ┌──────────────────────────────────────────────────────────────┐
+  │  pg_dump --schema-only azure_db > azure_schema.sql           │
+  │  pg_dump --schema-only onprem_db > onprem_schema.sql         │
+  │  diff azure_schema.sql onprem_schema.sql                     │
+  └────────────────────────┬─────────────────────────────────────┘
+                           │
+                  ◆ Diff empty?
+                  ├── NO ──▶ Apply missing DDL to on-prem
+                  YES
+                           │
+  ② Row count comparison (all tables)
+  ┌──────────────────────────────────────────────────────────────┐
+  │  SELECT tablename, n_live_tup FROM pg_stat_user_tables       │
+  │  -- run on BOTH sides; compare results                       │
+  └────────────────────────┬─────────────────────────────────────┘
+                           │
+                  ◆ All tables match (±0.1%)?
+                  ├── NO ──▶ Identify deltas; re-sync or re-dump
+                  YES
+                           │
+  ③ Checksum spot-check (critical tables)
+  ┌──────────────────────────────────────────────────────────────┐
+  │  SELECT md5(string_agg(t::text,'')) FROM <critical_table> t  │
+  │  -- run on BOTH sides; hashes must match                     │
+  └────────────────────────┬─────────────────────────────────────┘
+                           │
+                  ◆ Hashes match?
+                  ├── NO ──▶ Row-level diff investigation
+                  YES
+                           │
+  ④ Application smoke tests
+  ┌──────────────────────────────────────────────────────────────┐
+  │  curl -s https://onprem-api/health  → 200 OK                 │
+  │  Run automated test suite against on-prem endpoints          │
+  └────────────────────────┬─────────────────────────────────────┘
+                           │
+                  ◆ All tests pass?
+                  ├── NO ──▶ Fix app config / connection strings
+                  YES
+                           │
+                           ▼
+                  ✅ Data validation complete — safe to proceed
+```
+
 
 ## Table of Contents
 1. [Migration Strategy Overview](#migration-strategy-overview)

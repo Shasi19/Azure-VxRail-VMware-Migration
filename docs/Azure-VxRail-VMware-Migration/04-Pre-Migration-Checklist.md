@@ -22,6 +22,159 @@
    Remediate / Re-test
 ```
 
+---
+
+## Flowchart 1 — 11-Phase Gate Progression
+
+```
+╔═══════════════════════════════════════════════════════════════════╗
+║               11-PHASE GATE PROGRESSION                          ║
+╚════════════════════════════╤══════════════════════════════════════╝
+                             │
+    ┌────────────────────────▼──────────────────────────┐
+    │  PHASE 0 · Project Readiness (Week -2)             │
+    │  Charter signed │ Team assembled │ Budget approved  │
+    └────────────────────────┬──────────────────────────┘
+                             │
+                    ◆ GATE 0 PASS?
+                    ├── FAIL ──▶ ┌──────────────────────┐
+                    │            │ Escalate to sponsor  │
+                    │            │ Re-run checklist     │
+                    │            └──────────────────────┘
+                    PASS
+                             │
+    ┌────────────────────────▼──────────────────────────┐
+    │  PHASE 1 · Infrastructure Procurement (Week -1)    │
+    │  VxRail capacity │ Networking VLANs │ DNS zones    │
+    └────────────────────────┬──────────────────────────┘
+                             │
+                    ◆ GATE 1 PASS?
+                    ├── FAIL ──▶ Procurement team action
+                    PASS
+                             │
+    ┌────────────────────────▼──────────────────────────┐
+    │  PHASE 2 · Network Readiness (Week 0)              │
+    │  VLANs live │ Firewall rules │ VPN tunnels up       │
+    └────────────────────────┬──────────────────────────┘
+                             │
+                    ◆ GATE 2 PASS?
+                    ├── FAIL ──▶ Network team remediation
+                    PASS
+                             │
+    ┌────────────────────────▼──────────────────────────┐
+    │  PHASE 3 · VM Provisioning                         │
+    │  All VMs created │ Oracle Linux 9 configured       │
+    └────────────────────────┬──────────────────────────┘
+                             │
+                    ◆ GATE 3 PASS?
+                    ├── FAIL ──▶ Re-provision / fix cloud-init
+                    PASS
+                             │
+    ┌────────────────────────▼──────────────────────────┐
+    │  PHASE 4 · Kubernetes Setup                        │
+    │  kubeadm init │ CNI live │ CSI working             │
+    └────────────────────────┬──────────────────────────┘
+                             │
+                    ◆ GATE 4 PASS?
+                    ├── FAIL ──▶ Fix kubeadm / CNI issues
+                    PASS
+                             │
+    ┌────────────────────────▼──────────────────────────┐
+    │  PHASE 5 · Database Setup                          │
+    │  Patroni 3-node cluster │ pglogical installed      │
+    └────────────────────────┬──────────────────────────┘
+                             │
+                    ◆ GATE 5 PASS?
+                    ├── FAIL ──▶ Fix Patroni config / etcd
+                    PASS
+                             │
+    ┌────────────────────────▼──────────────────────────┐
+    │  PHASE 6 · Harbor & Image Migration                │
+    │  Harbor live │ All images pushed │ Pull policy set │
+    └────────────────────────┬──────────────────────────┘
+                             │
+                    ◆ GATE 6 PASS?
+                    ├── FAIL ──▶ Fix registry / TLS certs
+                    PASS
+                             │
+    ┌────────────────────────▼──────────────────────────┐
+    │  PHASE 7 · QA Environment Migration                │
+    │  Apps deployed │ DB migrated (pg_dump) │ Tests pass│
+    └────────────────────────┬──────────────────────────┘
+                             │
+                    ◆ GATE 7 PASS?
+                    ├── FAIL ──▶ Rollback QA, fix & retry
+                    PASS
+                             │
+    ┌────────────────────────▼──────────────────────────┐
+    │  PHASE 8 · PREPROD Environment Migration           │
+    │  pglogical replication │ Performance validated     │
+    └────────────────────────┬──────────────────────────┘
+                             │
+                    ◆ GATE 8 PASS?
+                    ├── FAIL ──▶ Rollback PREPROD, investigate
+                    PASS
+                             │
+    ┌────────────────────────▼──────────────────────────┐
+    │  PHASE 9 · PROD Cutover (Maintenance Window)       │
+    │  DNS flipped │ DB promoted │ Validation passed     │
+    └────────────────────────┬──────────────────────────┘
+                             │
+                    ◆ GATE 9 PASS?
+                    ├── FAIL ──▶ PROD rollback (< 2 hours)
+                    PASS
+                             │
+    ┌────────────────────────▼──────────────────────────┐
+    │  PHASE 10 · Post-Migration Stabilisation           │
+    │  Monitoring │ Veeam verified │ Azure decommission  │
+    └────────────────────────┬──────────────────────────┘
+                             │
+                    ◆ GATE 10 PASS?
+                    ├── FAIL ──▶ Extend hypercare period
+                    PASS
+                             │
+                             ▼
+                    ✅ MIGRATION COMPLETE
+```
+
+---
+
+## Flowchart 2 — Readiness Decision Tree
+
+```
+                        START: Pre-Migration Readiness?
+                                      │
+              ┌───────────────────────┼───────────────────────┐
+              ▼                       ▼                       ▼
+    ◆ Infrastructure          ◆ Database                ◆ Application
+      ready?                   ready?                    ready?
+              │                       │                       │
+    ┌───NO────┴────YES──┐   ┌───NO────┴────YES──┐   ┌───NO───┴────YES──┐
+    │                   │   │                   │   │                  │
+    ▼                   ▼   ▼                   ▼   ▼                  ▼
+ Provision         ┌────┐ Setup DB         ┌────┐ Fix config      ┌────┐
+ VxRail / K8s      │ ✅ │ Patroni+pglogical│ ✅ │ / images        │ ✅ │
+ (Phases 3-6)      └────┘ (Phase 5)        └────┘ (Phase 6-7)     └────┘
+                                                         │
+                   All three ✅ ?
+                         │
+                   YES ──▶ ◆ Security sign-off received?
+                         │
+                   ├──NO──▶ Security team review (Phase 2)
+                   │
+                   YES
+                         │
+                         ▼
+                   ◆ Business stakeholders approved?
+                         │
+                   ├──NO──▶ Change Advisory Board meeting
+                   │
+                   YES
+                         │
+                         ▼
+                   ✅ READY TO PROCEED
+```
+
 
 ## Executive Summary
 

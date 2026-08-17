@@ -14,6 +14,258 @@
 └── NO ──▶ Continue remediation in place
 ```
 
+---
+
+## Flowchart 1 — Master Rollback Decision Tree
+
+```
+                        ⚠  INCIDENT DETECTED
+                               │
+               ┌───────────────┼───────────────┐
+               ▼               ▼               ▼
+        ◆ Severity?       ◆ Phase?        ◆ Data loss?
+               │               │               │
+   ┌───────────┼───────┐       │               ├── YES ──▶ CRITICAL
+   │           │       │       │               └── NO  ──▶ assess below
+ CRITICAL    HIGH    MEDIUM    │
+   │           │       │       ├── QA       ──▶ Section 2
+   │           │       │       ├── PREPROD  ──▶ Section 3
+   ▼           ▼       ▼       └── PROD     ──▶ Section 4
+  ┌──────────────────────────────────────────────────────────────┐
+  │                    SEVERITY ASSESSMENT                       │
+  ├──────────────────────────────────────────────────────────────┤
+  │ CRITICAL (immediate rollback):                               │
+  │  • Database corruption                                       │
+  │  • Data loss confirmed                                       │
+  │  • Complete infra failure                                    │
+  │  • Security breach in migration path                         │
+  │  • Network down > 5 min                                      │
+  ├──────────────────────────────────────────────────────────────┤
+  │ HIGH (rollback within 1 hour):                               │
+  │  • Replication lag > 10 s sustained                          │
+  │  • Error rate > 2% for > 10 min                              │
+  │  • > 50% users impacted                                      │
+  ├──────────────────────────────────────────────────────────────┤
+  │ MEDIUM (assess & decide within 30 min):                      │
+  │  • Performance > 20% degraded                                │
+  │  • Intermittent connectivity                                 │
+  │  • Isolated pod crashes                                      │
+  ├──────────────────────────────────────────────────────────────┤
+  │ LOW (monitor & proceed):                                     │
+  │  • Single pod restart                                        │
+  │  • Transient latency spike                                   │
+  └──────────────────────────────────────────────────────────────┘
+               │               │               │
+   CRITICAL/HIGH             MEDIUM           LOW
+               │               │               │
+               ▼               ▼               ▼
+        TRIGGER            Go/No-go        Continue +
+        ROLLBACK           team vote       monitor
+```
+
+---
+
+## Flowchart 2 — QA Rollback Flow
+
+```
+  ① Decision & Notification (0–5 min)
+  ┌──────────────────────────────────────────────────────────┐
+  │  Notify: QA Lead, Infra Lead, PM                         │
+  │  Slack: #migration-qa-rollback                           │
+  └────────────────────────┬─────────────────────────────────┘
+                           │
+  ② Pause QA tests
+  ┌──────────────────────────────────────────────────────────┐
+  │  Halt any running test suites                            │
+  │  Document current failure state                          │
+  └────────────────────────┬─────────────────────────────────┘
+                           │
+  ③ Re-point QA to Azure DNS
+  ┌──────────────────────────────────────────────────────────┐
+  │  az network dns record-set a update \                    │
+  │    --resource-group rg-qa --zone-name qa.internal \      │
+  │    --record-set-name api --ipv4-address <azure-qa-ip>    │
+  └────────────────────────┬─────────────────────────────────┘
+                           │
+  ④ Verify Azure QA is responding
+  ┌──────────────────────────────────────────────────────────┐
+  │  curl -s https://qa-api.azure.internal/health → 200 OK   │
+  └────────────────────────┬─────────────────────────────────┘
+                           │
+                  ◆ Azure QA healthy?
+                  ├── NO ──▶ Escalate to Azure support
+                  YES
+                           │
+  ⑤ Root cause investigation (parallel)
+  ┌──────────────────────────────────────────────────────────┐
+  │  Review pod logs, DB logs, network traces                │
+  │  Fix issue in on-prem environment                        │
+  │  Re-test before next migration attempt                   │
+  └────────────────────────┬─────────────────────────────────┘
+                           │
+                           ▼
+                  ✅ QA rollback complete (RTO target: 2 hrs)
+```
+
+---
+
+## Flowchart 3 — PREPROD Rollback Flow
+
+```
+  ① Incident declared (0–5 min)
+  ┌──────────────────────────────────────────────────────────┐
+  │  Notify: Infra Lead, DB Admin, PM, Ops Lead              │
+  │  Bridge: Start war room call                             │
+  └────────────────────────┬─────────────────────────────────┘
+                           │
+  ② Stop application writes to on-prem
+  ┌──────────────────────────────────────────────────────────┐
+  │  kubectl scale deployment --all --replicas=0 -n preprod  │
+  └────────────────────────┬─────────────────────────────────┘
+                           │
+  ③ Verify Azure PREPROD DB is at acceptable state
+  ┌──────────────────────────────────────────────────────────┐
+  │  psql -h <azure-preprod> -c "SELECT count(*) FROM <tbl>" │
+  │  Compare with on-prem counts                             │
+  └────────────────────────┬─────────────────────────────────┘
+                           │
+                  ◆ Data delta acceptable (< RPO 24hr)?
+                  ├── NO ──▶ Evaluate data reconciliation
+                  YES
+                           │
+  ④ Re-point PREPROD DNS to Azure
+  ┌──────────────────────────────────────────────────────────┐
+  │  Update DNS → Azure PREPROD LB IP                        │
+  │  TTL flush on internal resolvers                         │
+  └────────────────────────┬─────────────────────────────────┘
+                           │
+  ⑤ Scale Azure PREPROD apps back up
+  ┌──────────────────────────────────────────────────────────┐
+  │  kubectl scale deployment --all --replicas=2 -n preprod  │
+  │  (pointing to Azure cluster)                             │
+  └────────────────────────┬─────────────────────────────────┘
+                           │
+                           ▼
+                  ✅ PREPROD rollback complete (RTO: 4 hrs)
+```
+
+---
+
+## Flowchart 4 — PROD Rollback Flow (Minute-by-Minute)
+
+```
+  T+00:00  Incident declared
+  ┌──────────────────────────────────────────────────────────┐
+  │  On-call lead: "Initiating PROD rollback"                │
+  │  Broadcast: Slack #prod-incident, PagerDuty              │
+  └────────────────────────┬─────────────────────────────────┘
+
+  T+02:00  Stop new writes to on-prem
+  ┌──────────────────────────────────────────────────────────┐
+  │  kubectl scale deployment/api-gateway --replicas=0 -n prod│
+  │  All other write-path services scaled to 0               │
+  └────────────────────────┬─────────────────────────────────┘
+
+  T+05:00  Confirm Azure PROD DB is in a good state
+  ┌──────────────────────────────────────────────────────────┐
+  │  psql -h <azure-prod> -c "SELECT now(), count(*) ..."    │
+  │  ◆ Azure DB healthy?                                     │
+  │  ├── NO ──▶ CRITICAL ESCALATION: call Azure support NOW  │
+  │  YES ──▶ continue                                        │
+  └────────────────────────┬─────────────────────────────────┘
+
+  T+08:00  Re-enable writes on Azure PROD
+  ┌──────────────────────────────────────────────────────────┐
+  │  ALTER DATABASE prod SET default_transaction_read_only   │
+  │  = off;   (if it was set read-only during migration)     │
+  └────────────────────────┬─────────────────────────────────┘
+
+  T+10:00  Flip DNS back to Azure
+  ┌──────────────────────────────────────────────────────────┐
+  │  az network dns record-set a update \                    │
+  │    --zone-name company.com \                             │
+  │    --record-set-name api \                               │
+  │    --ipv4-address <azure-prod-lb-ip>                     │
+  │  TTL: 60 (already lowered before cutover)                │
+  └────────────────────────┬─────────────────────────────────┘
+
+  T+12:00  Verify DNS propagation
+  ┌──────────────────────────────────────────────────────────┐
+  │  dig api.company.com +short  → should show Azure IP      │
+  │  curl -s https://api.company.com/health → 200 OK         │
+  └────────────────────────┬─────────────────────────────────┘
+                           │
+                  ◆ Health check passes?
+                  ├── NO ──▶ T+15 escalate, check Azure LB
+                  YES
+                           │
+  T+15:00  Scale Azure PROD apps back up
+  ┌──────────────────────────────────────────────────────────┐
+  │  kubectl scale deployment --all --replicas=3 -n prod     │
+  │  (Azure cluster)                                         │
+  └────────────────────────┬─────────────────────────────────┘
+
+  T+20:00  Validate application fully operational
+  ┌──────────────────────────────────────────────────────────┐
+  │  Run synthetic monitoring checks                         │
+  │  Error rate < 0.1%?  p95 latency < baseline?            │
+  └────────────────────────┬─────────────────────────────────┘
+                           │
+  T+30:00  Incident retrospective scheduled
+  ┌──────────────────────────────────────────────────────────┐
+  │  Document: timeline, root cause, fix required            │
+  │  Schedule: retry migration attempt (after fix)           │
+  └────────────────────────┬─────────────────────────────────┘
+                           │
+                           ▼
+                  ✅ PROD rollback complete (RTO < 2 hrs)
+```
+
+---
+
+## Flowchart 5 — DNS Rollback Sequence
+
+```
+  FORWARD (Cutover):  Azure IP ──▶ On-Prem IP
+  ROLLBACK:           On-Prem IP ──▶ Azure IP
+
+  ① Pre-requisite: TTL lowered to 60 sec before cutover window
+
+  ② Rollback sequence:
+
+  ┌─────────────────────────────────────────────────────────────────┐
+  │  Record            │ Current (on-prem)     │ Rollback (Azure)   │
+  ├─────────────────────────────────────────────────────────────────┤
+  │  api.company.com   │ 10.52.100.10 (MetalLB)│ 40.x.x.x (Azure LB)│
+  │  admin.company.com │ 10.52.100.11          │ 40.x.x.y           │
+  │  *.internal        │ 10.52.100.x           │ 10.40.x.x (VNet)   │
+  └─────────────────────────────────────────────────────────────────┘
+
+  ③ Execute DNS change:
+     External (Azure DNS zone):
+     az network dns record-set a update \
+       --zone-name company.com --record-set-name api \
+       --ipv4-address <azure-ip>
+
+     Internal (on-prem Bind9 → Azure Private DNS):
+     rndc reload   # after updating zone file
+
+  ④ Verify propagation globally:
+     dig @8.8.8.8 api.company.com +short       → Azure IP
+     dig @1.1.1.1 api.company.com +short       → Azure IP
+     dig @<on-prem-dns> api.company.com +short → Azure IP
+
+  ⑤ Wait TTL (60 s) + 30 s buffer, then re-confirm:
+     curl -sk https://api.company.com/health | jq .status
+     Expected: "ok"  |  Source header: "azure"
+
+  ⑥ ◆ All resolvers returning Azure IP?
+     ├── NO ──▶ Flush resolver cache:
+     │          systemd-resolve --flush-caches
+     │          kubectl rollout restart deployment/coredns -n kube-system
+     YES ──▶ DNS rollback confirmed ✅
+```
+
 
 ## Table of Contents
 1. [Rollback Overview](#rollback-overview)
