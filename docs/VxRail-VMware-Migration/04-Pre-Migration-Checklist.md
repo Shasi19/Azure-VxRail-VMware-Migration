@@ -4,6 +4,25 @@
 
 ---
 
+## Gate Decision Flowchart
+
+```
+┌──────────────┐
+│ ① Readiness  │
+└──────┬───────┘
+       ▼
+┌──────────────┐
+│ ② Validate   │
+└──────┬───────┘
+       ▼
+◆ All checks pass? ──YES──▶ Proceed to QA
+       │
+       NO
+       ▼
+   Remediate / Re-test
+```
+
+
 ## Executive Summary
 
 This document contains the complete pre-flight checklist required before starting any phase of the Azure-to-On-Premises migration. All items must be completed, validated, and signed off before proceeding.
@@ -107,7 +126,7 @@ DRS Status: _____________________
 
 ### 1.3 Storage (vSAN) Validation
 - [ ] vSAN datastore created and healthy
-- [ ] Total usable capacity: 250 TB confirmed
+- [ ] Total total capacity: 247.66 TB (156.8 TB used, 90.86 TB free) confirmed
 - [ ] FTT=1 (Fault Tolerance) configured
 - [ ] Compression enabled
 - [ ] Deduplication enabled
@@ -482,5 +501,5 @@ Date: _____________ By: _________________
 
 **End of Pre-Migration Checklist**
 
-Reference: [00-VxRail-Complete-Index.md](#), [03-Target-State-Architecture.md](#)
+Reference: [00-VxRail-Complete-Index.md](./00-VxRail-Complete-Index.md), [03-Target-State-Architecture.md](./03-Target-State-Architecture.md)
 

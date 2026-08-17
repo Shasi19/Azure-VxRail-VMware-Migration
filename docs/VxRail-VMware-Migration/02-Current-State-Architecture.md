@@ -4,6 +4,19 @@
 
 ---
 
+## Azure Architecture Flowchart
+
+```
+┌──────────────┐   ┌──────────────┐   ┌──────────────┐
+│ Users        │──▶│ Azure Front  │──▶│ AKS Services │
+└──────────────┘   └──────────────┘   └──────┬───────┘
+                                             │
+                                  ┌──────────▼──────────┐
+                                  │ PostgreSQL/CosmosDB │
+                                  └─────────────────────┘
+```
+
+
 ## Table of Contents
 1. [Executive Summary](#executive-summary)
 2. [Current Azure Infrastructure](#current-azure-infrastructure)
@@ -582,5 +595,5 @@ CDN:
 
 **End of Current State Architecture Document**
 
-Reference: [03-Target-State-Architecture.md](#), [04-Pre-Migration-Checklist.md](#)
+Reference: [03-Target-State-Architecture.md](./03-Target-State-Architecture.md), [04-Pre-Migration-Checklist.md](./04-Pre-Migration-Checklist.md)
 

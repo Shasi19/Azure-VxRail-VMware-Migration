@@ -4,6 +4,16 @@
 
 ---
 
+## Data Migration Decision Tree
+
+```
+◆ Need zero downtime?
+├── YES ──▶ pglogical replication
+├── NO, small dataset ──▶ pg_dump / pg_restore
+└── Backup/DR copy ──▶ physical snapshot
+```
+
+
 ## Table of Contents
 1. [Migration Strategy Overview](#migration-strategy-overview)
 2. [PostgreSQL Migration Methods](#postgresql-migration-methods)
@@ -445,5 +455,5 @@ COMPLEX_QUERY="SELECT u.name, COUNT(o.order_id) as order_count FROM users u
 
 ---
 
-**Reference**: [00-VxRail-Complete-Index.md](#), [07-PROD-Detailed-Implementation.md](#), [09-Rollback-Procedures.md](#)
+**Reference**: [00-VxRail-Complete-Index.md](./00-VxRail-Complete-Index.md), [07-PROD-Detailed-Implementation.md](./07-PROD-Detailed-Implementation.md), [09-Rollback-Procedures.md](./09-Rollback-Procedures.md)
 

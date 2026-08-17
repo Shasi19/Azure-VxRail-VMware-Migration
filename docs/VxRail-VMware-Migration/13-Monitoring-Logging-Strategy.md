@@ -210,7 +210,7 @@ Panel 2: Pod Status
 - Restart rate: < 1/hour
 
 Panel 3: Storage
-- vSAN usage: 45% of 250 TB
+- vSAN usage: 63.3% of 247.66 TB (156.8 TB used, 90.86 TB free)
 - Storage I/O: 500 IOPS
 - vSAN rebuild status (if any)
 
@@ -663,5 +663,5 @@ Application Logs:
 
 ---
 
-**Reference**: [00-VxRail-Complete-Index.md](#), [12-Cutover-Runbook.md](#)
+**Reference**: [00-VxRail-Complete-Index.md](./00-VxRail-Complete-Index.md), [12-Cutover-Runbook.md](./12-Cutover-Runbook.md)
 

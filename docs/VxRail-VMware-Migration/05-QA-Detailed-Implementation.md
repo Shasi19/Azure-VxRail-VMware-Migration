@@ -649,5 +649,5 @@ Signed:
 
 **End of QA Detailed Implementation**
 
-Reference: [00-VxRail-Complete-Index.md](#), [06-PREPROD-Detailed-Implementation.md](#), [04-Pre-Migration-Checklist.md](#)
+Reference: [00-VxRail-Complete-Index.md](./00-VxRail-Complete-Index.md), [06-PREPROD-Detailed-Implementation.md](./06-PREPROD-Detailed-Implementation.md), [04-Pre-Migration-Checklist.md](./04-Pre-Migration-Checklist.md)
 

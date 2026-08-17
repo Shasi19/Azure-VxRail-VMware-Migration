@@ -4,6 +4,13 @@
 
 ---
 
+## Minute-by-Minute Cutover Flowchart
+
+```
+15:30 Prep ──▶ 16:00 Freeze ──▶ 16:30 Final Sync ──▶ 17:00 DNS Switch ──▶ Validate ──▶ Hypercare
+```
+
+
 ## Cutover Window: Friday 16:00 - Saturday 16:00 (24 hours)
 
 ### Pre-Cutover (T-1 week)
@@ -419,5 +426,5 @@ Day 29+ (Optimization):
 
 ---
 
-**Reference**: [00-VxRail-Complete-Index.md](#), [09-Rollback-Procedures.md](#), [07-PROD-Detailed-Implementation.md](#)
+**Reference**: [00-VxRail-Complete-Index.md](./00-VxRail-Complete-Index.md), [09-Rollback-Procedures.md](./09-Rollback-Procedures.md), [07-PROD-Detailed-Implementation.md](./07-PROD-Detailed-Implementation.md)
 

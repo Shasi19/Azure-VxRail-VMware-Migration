@@ -4,6 +4,19 @@
 
 ---
 
+## On-Prem Architecture + Data Flow
+
+```
+┌─────────────┐   ┌──────────────┐   ┌───────────────┐
+│ Users / DNS │──▶│ MetalLB / In │──▶│ K8s Workloads │
+└─────────────┘   └──────────────┘   └──────┬────────┘
+                                            │
+                  ┌─────────────────────────▼─────────────────────────┐
+                  │ Patroni PostgreSQL + vSAN 247.66 TB / 90.86 TB free│
+                  └────────────────────────────────────────────────────┘
+```
+
+
 ## Table of Contents
 1. [Architecture Overview](#architecture-overview)
 2. [Physical Infrastructure](#physical-infrastructure)
@@ -27,7 +40,7 @@ On-Premises VxRail HCI Cluster
 ├── 6 Dell PowerEdge Servers (2-socket, 32-core each)
 ├── 3 vSphere Master Nodes (Kubernetes control plane)
 ├── 15 Worker Nodes (across QA/PREPROD/PROD)
-├── vSAN Storage (250 TB usable)
+├── vSAN Storage (247.66 TB total, 90.86 TB free)
 ├── 10GbE Network (redundant, converged)
 └── Veeam Backup to local NAS
 
@@ -39,7 +52,7 @@ Workloads:
 Total Capacity:
 - CPUs: 192 vCPUs (64% for workers, 12% for masters, 24% overhead)
 - RAM: 768 GB (60% for workloads, 20% for vSAN, 20% overhead)
-- Storage: 250 TB usable (vSAN redundancy 2x)
+- Storage: 247.66 TB total (156.8 TB used, 90.86 TB free)
 ```
 
 ### Environment Separation
@@ -95,10 +108,10 @@ Per-Node Specifications:
 └── Out-of-Band Management: iDRAC9 with secure boot
 
 Cluster Specifications:
-├── Total CPUs: 192 cores (6 nodes × 32 cores)
-├── Total Memory: 3 TB (6 nodes × 512 GB)
-├── vSAN Raw Capacity: 500 TB (6 nodes × 83 TB)
-├── vSAN Usable (FTT=1, striping=1): 250 TB
+├── Total CPU Capacity: 871.58 GHz (149.84 GHz used, 721.75 GHz free)
+├── Total Memory: 4.5 TB (3.11 TB used, 1.38 TB free)
+├── vSAN Total Capacity: 247.66 TB (9 datastores)
+├── vSAN Used: 156.8 TB | Free: 90.86 TB
 ├── Network Throughput: 240 Gbps aggregate (6 × 40 Gbps)
 └── Power Consumption: ~18 kW per node, ~108 kW total
 ```
@@ -362,7 +375,7 @@ Collections (from Cosmos DB):
 
 ```
 vSAN Datastore Configuration:
-├── Total Capacity: 250 TB usable (after FTT=1 + overhead)
+├── Total Capacity: 247.66 TB total capacity, 90.86 TB free (after FTT=1 + overhead)
 ├── Allocated to Kubernetes: 200 TB
 ├── Reserved for System/Buffer: 50 TB
 
@@ -568,7 +581,7 @@ Backup Verification:
 Primary Site (On-Premises VxRail):
 ├── Kubernetes Clusters: k8s-qa, k8s-preprod, k8s-prod
 ├── Databases: PostgreSQL Patroni HA (3-node)
-├── Storage: vSAN (250 TB usable)
+├── Storage: vSAN (247.66 TB total, 90.86 TB free)
 ├── Backup: Veeam (local NAS)
 └── Objective: Normal operations
 
@@ -736,5 +749,5 @@ Container Registry Access:
 
 **End of Target State Architecture Document**
 
-Reference: [02-Current-State-Architecture.md](#), [04-Pre-Migration-Checklist.md](#), [05-QA-Detailed-Implementation.md](#)
+Reference: [02-Current-State-Architecture.md](./02-Current-State-Architecture.md), [04-Pre-Migration-Checklist.md](./04-Pre-Migration-Checklist.md), [05-QA-Detailed-Implementation.md](./05-QA-Detailed-Implementation.md)
 

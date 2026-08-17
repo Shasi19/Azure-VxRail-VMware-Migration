@@ -4,6 +4,25 @@
 
 ---
 
+## DR Failover Flowchart
+
+```
+┌──────────────┐
+│ Incident     │
+└──────┬───────┘
+       ▼
+┌──────────────┐
+│ Assess RTO   │
+└──────┬───────┘
+       ▼
+◆ Recover local? ──YES──▶ Restore service
+       │
+       NO
+       ▼
+  Fail over to DR workflow
+```
+
+
 ## Table of Contents
 1. [DR Objectives](#dr-objectives)
 2. [Backup Strategy](#backup-strategy)
@@ -416,5 +435,5 @@ Required Documentation:
 
 ---
 
-**Reference**: [00-VxRail-Complete-Index.md](#), [09-Rollback-Procedures.md](#), [12-Cutover-Runbook.md](#)
+**Reference**: [00-VxRail-Complete-Index.md](./00-VxRail-Complete-Index.md), [09-Rollback-Procedures.md](./09-Rollback-Procedures.md), [12-Cutover-Runbook.md](./12-Cutover-Runbook.md)
 

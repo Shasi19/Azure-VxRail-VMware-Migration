@@ -4,6 +4,17 @@
 
 ---
 
+## Rollback Decision Tree
+
+```
+◆ Critical data or service failure?
+├── YES ──▶ Trigger rollback bridge
+│          ├── DNS back to Azure
+│          └── Re-enable Azure writes
+└── NO ──▶ Continue remediation in place
+```
+
+
 ## Table of Contents
 1. [Rollback Overview](#rollback-overview)
 2. [QA Phase Rollback](#qa-phase-rollback)
@@ -405,5 +416,5 @@ residual issues. Full incident post-mortem to follow within 24 hours."
 
 ---
 
-**Reference**: [00-VxRail-Complete-Index.md](#), [12-Cutover-Runbook.md](#), [09-Rollback-Procedures.md](#)
+**Reference**: [00-VxRail-Complete-Index.md](./00-VxRail-Complete-Index.md), [12-Cutover-Runbook.md](./12-Cutover-Runbook.md), [09-Rollback-Procedures.md](./09-Rollback-Procedures.md)
 

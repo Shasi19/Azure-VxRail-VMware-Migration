@@ -6,6 +6,18 @@
 
 ---
 
+## Architecture Comparison Flowchart
+
+```
+┌──────────────────────────┐      ┌──────────────────────────┐
+│ Current Azure Estate     │ ───▶ │ Target VxRail Estate     │
+│ AKS + Azure DB services  │      │ K8s + Patroni + Harbor   │
+└──────────────────────────┘      └──────────────────────────┘
+          │                                      │
+          └────────────── compare, size, migrate ┘
+```
+
+
 ## Table of Contents
 
 1. [Current Azure Architecture](#1-current-azure-architecture)

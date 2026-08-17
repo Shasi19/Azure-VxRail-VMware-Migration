@@ -4,6 +4,17 @@
 
 ---
 
+## Troubleshooting Decision Trees
+
+```
+◆ Issue type?
+├── Infra ──▶ vSphere / vSAN section
+├── Network ──▶ VLAN / LB / DNS section
+├── Database ──▶ PostgreSQL / pglogical section
+└── App ──▶ Pod / image / PVC section
+```
+
+
 ## Quick Error Index
 
 | Stage | Common Errors | Jump To |
