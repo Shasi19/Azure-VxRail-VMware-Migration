@@ -116,7 +116,7 @@
 
 ---
 
-## 📚 Complete Document List (15 Documents)
+## 📚 Complete Document List (19 Documents)
 
 ### **Phase 0: Planning & Architecture (4 documents)**
 
@@ -125,7 +125,7 @@
 | 00 | [VxRail-Complete-Index](./00-VxRail-Complete-Index.md) | Master navigation (this file) | Always |
 | 01 | [Architecture-Overview](./01-Architecture-Overview.md) | Why each tool, current + target state, tool justification | Day 0 |
 | 02 | [Current-State-Architecture](./02-Current-State-Architecture.md) | Azure baseline: AKS, PostgreSQL, Cosmos DB inventory | Week 1 |
-| 03 | [Target-State-Architecture](./03-Target-State-Architecture.md) | On-prem design: 6-node VxRail, K8s 1.34, PostgreSQL HA | Week 1 |
+| 03 | [Target-State-Architecture](./03-Target-State-Architecture.md) | On-prem design: 6-node VxRail, K8s 1.34, PostgreSQL HA + buffered VM sizing | Week 1 |
 
 ### **Phase 1: Pre-Migration Validation (1 document)**
 
@@ -133,13 +133,22 @@
 |---|----------|---------|----------|
 | 04 | [Pre-Migration-Checklist](./04-Pre-Migration-Checklist.md) | 11-phase readiness validation with sign-offs | Weeks -2 to 0 |
 
-### **Phase 2-4: Environment Implementation (3 documents)**
+### **Phase 2–4: Environment Implementation (3 documents)**
 
-| # | Document | Scope | Duration | VM Allocation |
-|---|----------|-------|----------|---------------|
-| 05 | [QA-Detailed-Implementation](./05-QA-Detailed-Implementation.md) | Testing & validation | Weeks 1–3 | 3 Masters + 3 Workers |
-| 06 | [PREPROD-Detailed-Implementation](./06-PREPROD-Detailed-Implementation.md) | Patroni HA + load test | Weeks 4–8 | 3 Masters + 9 Workers |
-| 07 | [PROD-Detailed-Implementation](./07-PROD-Detailed-Implementation.md) | Live migration + cutover | Weeks 9–16 | 3 Masters + 12 Workers |
+| # | Document | Scope | VMs | Key Content |
+|---|----------|-------|-----|-------------|
+| 05 | [QA-Detailed-Implementation](./05-QA-Detailed-Implementation.md) | Weeks 1–3 | 3M+3W (12vCPU/48GB/200GB) | Full master+worker OS config, K8s init, PostgreSQL 15 |
+| 06 | [PREPROD-Detailed-Implementation](./06-PREPROD-Detailed-Implementation.md) | Weeks 4–8 | 3M+9W (16vCPU/64GB/250GB) | Patroni HA, etcd, pgBouncer, load test 3K users |
+| 07 | [PROD-Detailed-Implementation](./07-PROD-Detailed-Implementation.md) | Weeks 9–16 | 3M+12W (24vCPU/96GB/300GB) | pglogical, zero-downtime cutover, full Patroni YAML |
+
+### **Environment Migration Plans — Per-Environment (4 documents)** ← NEW
+
+| # | Document | Scope | Key Content |
+|---|----------|-------|-------------|
+| 15 | [QA-Migration-Plan](./15-QA-Migration-Plan.md) | QA data + app migration | pg_dump, Harbor image sync, secret migration, smoke tests, rollback |
+| 16 | [PREPROD-Migration-Plan](./16-PREPROD-Migration-Plan.md) | PREPROD migration | pg_dump → Patroni restore, replication validation, load test gate |
+| 17 | [PROD-Migration-Plan](./17-PROD-Migration-Plan.md) | PROD live migration | pglogical setup, dual-run, minute-by-minute cutover, rollback tree |
+| 18 | [Application-Backup-DR-Plan](./18-Application-Backup-DR-Plan.md) | App backup + DR runbook | Kasten K10, PITR, 6 DR scenarios, RTO/RPO per service |
 
 ### **Data Movement (1 document)**
 
