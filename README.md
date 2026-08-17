@@ -1,5 +1,5 @@
-# Azure → On-Premises VxRail Migration
-## Complete Documentation for Dell VxRail HCI + VMware vSphere Deployment
+# Azure → VxRail VMware Migration
+## Complete Migration Guide: Azure Workloads → Dell VxRail HCI + VMware vSphere On-Premises
 
 > **Objective:** Migrate workloads from Azure (AKS + PostgreSQL + Cosmos DB) to on-premises 6-node Dell VxRail HCI cluster with VMware vSphere
 >
@@ -15,7 +15,7 @@
 ```
 Migration/
 └── docs/
-    └── VxRail-VMware-Migration/   ← COMPLETE MIGRATION DOCUMENTATION (15 files)
+    └── Azure-VxRail-VMware-Migration/   ← COMPLETE MIGRATION DOCUMENTATION (15 files)
         ├── 00-VxRail-Complete-Index.md              ← START HERE — Master guide & navigation
         ├── 01-Architecture-Overview.md              ← Current Azure + Target on-prem design
         ├── 02-Current-State-Architecture.md         ← Azure baseline (AKS, PostgreSQL, Cosmos)
@@ -37,7 +37,7 @@ Migration/
 
 ## 🚀 Quick Start
 
-### Start Reading Here → [`00-VxRail-Complete-Index.md`](docs/VxRail-VMware-Migration/00-VxRail-Complete-Index.md)
+### Start Reading Here → [`00-VxRail-Complete-Index.md`](docs/Azure-VxRail-VMware-Migration/00-VxRail-Complete-Index.md)
 
 This index provides:
 - ✅ Role-based reading paths (for architects, DBAs, DevOps, project managers)
@@ -238,4 +238,4 @@ All documents are heavily cross-referenced:
 
 ---
 
-**Next Step:** Open [`docs/VxRail-VMware-Migration/00-VxRail-Complete-Index.md`](docs/VxRail-VMware-Migration/00-VxRail-Complete-Index.md) to begin
+**Next Step:** Open [`docs/Azure-VxRail-VMware-Migration/00-VxRail-Complete-Index.md`](docs/Azure-VxRail-VMware-Migration/00-VxRail-Complete-Index.md) to begin
