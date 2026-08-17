@@ -21,7 +21,7 @@
 5. Execute: [07-PROD-Detailed-Implementation.md](#) - PROD phase
 6. Reference: [08-Migration-Procedures.md](#) - Data migration strategies
 7. Reference: [13-Monitoring-Logging-Strategy.md](#) - Observability setup
-8. Reference: [11-Troubleshooting-Deep-Dive.md](#) - Problem resolution
+8. Reference: [14-Troubleshooting-Errors.md](#) - Problem resolution
 
 ### **For Database Administrators (DBAs)**
 1. Read: [02-Current-State-Architecture.md](#) - Current PostgreSQL/MongoDB setup
@@ -36,8 +36,8 @@
 1. Read: [02-Current-State-Architecture.md](#) - Azure networking baseline
 2. Read: [03-Target-State-Architecture.md](#) - On-prem network design
 3. Execute: [04-Pre-Migration-Checklist.md](#) - Network validation checklist
-4. Reference: [08-Network-vSphere.md](#) - DVS, VLAN, firewall configuration
-5. Reference: [11-Troubleshooting-Deep-Dive.md](#) - Network troubleshooting
+4. Reference: [07-PROD-Detailed-Implementation.md](#) - DVS, VLAN, firewall configuration
+5. Reference: [14-Troubleshooting-Errors.md](#) - Network troubleshooting
 
 ---
 
@@ -107,12 +107,12 @@ Total: 16 weeks (12 weeks work + 4 weeks buffers)
 #### **Infrastructure (VxRail/vSphere)**
 - Setup: [03-Target-State-Architecture.md](#), [04-Pre-Migration-Checklist.md](#)
 - Implementation: [05-QA-Detailed-Implementation.md](#), [06-PREPROD-Detailed-Implementation.md](#)
-- Troubleshooting: [11-Troubleshooting-Deep-Dive.md](#)
+- Troubleshooting: [14-Troubleshooting-Errors.md](#)
 
 #### **Kubernetes 1.34**
 - Design: [03-Target-State-Architecture.md](#)
-- Deployment: [05-QA-Detailed-Implementation.md](#), [10-Kubernetes-vSphere.md](#)
-- Troubleshooting: [11-Troubleshooting-Deep-Dive.md](#)
+- Deployment: [05-QA-Detailed-Implementation.md](#), [07-PROD-Detailed-Implementation.md](#)
+- Troubleshooting: [14-Troubleshooting-Errors.md](#)
 - Monitoring: [13-Monitoring-Logging-Strategy.md](#)
 
 #### **PostgreSQL & Patroni**
@@ -123,7 +123,7 @@ Total: 16 weeks (12 weeks work + 4 weeks buffers)
 - Live replication: [07-PROD-Detailed-Implementation.md](#)
 - Rollback: [09-Rollback-Procedures.md](#)
 - DR/PITR: [10-Disaster-Recovery-Strategy.md](#)
-- Troubleshooting: [11-Troubleshooting-Deep-Dive.md](#)
+- Troubleshooting: [14-Troubleshooting-Errors.md](#)
 
 #### **Backup & Disaster Recovery**
 - Strategy: [10-Disaster-Recovery-Strategy.md](#)
@@ -132,9 +132,9 @@ Total: 16 weeks (12 weeks work + 4 weeks buffers)
 - Rollback (emergency): [09-Rollback-Procedures.md](#)
 
 #### **Networking**
-- Design: [03-Target-State-Architecture.md](#), [08-Network-vSphere.md](#)
+- Design: [03-Target-State-Architecture.md](#), [07-PROD-Detailed-Implementation.md](#)
 - Validation: [04-Pre-Migration-Checklist.md](#)
-- Troubleshooting: [11-Troubleshooting-Deep-Dive.md](#)
+- Troubleshooting: [14-Troubleshooting-Errors.md](#)
 
 #### **Monitoring & Observability**
 - Architecture: [13-Monitoring-Logging-Strategy.md](#)
@@ -216,14 +216,14 @@ Total: 16 weeks (12 weeks work + 4 weeks buffers)
 
 ### **During Execution:**
 1. Follow phase-specific documents ([05](#), [06](#), [07](#))
-2. Reference technical guides as needed ([08-Network-vSphere.md](#), [10-Kubernetes-vSphere.md](#), etc.)
-3. Use [11-Troubleshooting-Deep-Dive.md](#) for problem resolution
+2. Reference technical guides as needed ([07-PROD-Detailed-Implementation.md](#), [07-PROD-Detailed-Implementation.md](#), etc.)
+3. Use [14-Troubleshooting-Errors.md](#) for problem resolution
 4. Monitor with [13-Monitoring-Logging-Strategy.md](#)
 
 ### **Emergency Situations:**
-1. **Database issue?** → [11-Troubleshooting-Deep-Dive.md](#) PostgreSQL section → [09-Rollback-Procedures.md](#)
-2. **Network issue?** → [11-Troubleshooting-Deep-Dive.md](#) Networking section
-3. **Kubernetes issue?** → [11-Troubleshooting-Deep-Dive.md](#) Kubernetes section
+1. **Database issue?** → [14-Troubleshooting-Errors.md](#) PostgreSQL section → [09-Rollback-Procedures.md](#)
+2. **Network issue?** → [14-Troubleshooting-Errors.md](#) Networking section
+3. **Kubernetes issue?** → [14-Troubleshooting-Errors.md](#) Kubernetes section
 4. **Need to rollback?** → [09-Rollback-Procedures.md](#) (phase-specific section)
 5. **DR scenario?** → [10-Disaster-Recovery-Strategy.md](#)
 
