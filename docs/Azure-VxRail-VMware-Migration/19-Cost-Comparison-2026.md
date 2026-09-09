@@ -13,6 +13,10 @@ The workbook's resource-detail rows total only **$9,011/month**, but that is not
 
 For on-premises, the repository says the six-node VxRail cluster, vSphere/vCenter, existing Veeam deployment, and TOR switching are already present. The migration does not require buying a second compute platform. The common incremental procurement estimate is **$20,000-$45,000 one time**, plus **$3,600-$19,300/year** for backup, OS, and certificate items, excluding migration labor, taxes, and facility costs. If the existing Veeam and OS entitlements cover the migrated workloads, the common incremental annual software cost can be close to **$0**.
 
+> **Important V3 correction:** The incremental figures above apply only when the existing VxRail cluster is reused. If leadership wants to buy a new six-node VxRail cluster, use the full-purchase model in [21-OnPrem-VxRail-TCO-2026.md](./21-OnPrem-VxRail-TCO-2026.md): **$1.04M-$2.39M initial approval envelope**, **$390k-$980k/year operating cost**, and **$2.39M-$5.75M three-year TCO including migration**.
+
+![Three-year cost comparison](./assets/onprem-tco-bars.svg)
+
 ## 1. Architecture-Scope Azure Cost from the Workbook
 
 ### Current architecture inventory used for costing

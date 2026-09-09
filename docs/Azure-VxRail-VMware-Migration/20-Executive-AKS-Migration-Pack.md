@@ -12,6 +12,7 @@
 - The visible subtotal is **not a complete environment bill**. Shared networking, storage, backup, monitoring, ingress, and unallocated subscription costs require an Azure Cost Management export.
 - PROD is inconsistent between the workbook and the repository target: workbook detail shows 11 PROD AKS nodes, while the target design plans 12 PROD workers plus 3 control-plane VMs.
 - Recommended sequence: validate QA, prove the selected platform in PREPROD, then migrate PROD only after a live replication and restore rehearsal.
+- New VxRail purchase changes the economics materially: budget **$1.04M-$2.39M initial**, **$390k-$980k/year operating**, and **$2.39M-$5.75M over three years** including migration.
 
 ## 1. Workbook-Based AKS Inventory
 
@@ -56,6 +57,8 @@ The `$3,595/month` figure is a **planning floor**, not a complete platform TCO. 
 **Exit criteria:** 15-node on-prem target Ready, database replication stable for at least 14 days, restore rehearsal passed, canary traffic passed for 72 hours, DNS rollback tested, and executive change approval recorded.
 
 ## 3. Target Operating Model
+
+![On-premises operating responsibilities](./assets/onprem-operating-model.svg)
 
 | Capability | QA | PREPROD | PROD |
 |---|---|---|---|
@@ -114,6 +117,16 @@ gantt
 | Logical replication capability | Could invalidate zero-downtime plan | DBA and Azure platform validation |
 | Same-site backup only | Site loss may exceed stated RTO/RPO | DR and security approval |
 | Platform license/support choice | Multi-year financial and staffing commitment | CTO/steering committee decision |
+
+## 7. Final Financial Recommendation
+
+The current Azure bill is a measured **$23,754/month**. Buying a new VxRail cluster introduces substantial capital, facilities, staffing, and maintenance obligations. Therefore:
+
+1. **Azure is the best immediate financial and operational choice**: optimize the mapped architecture services and reconcile the remaining subscription spend.
+2. **On-premises is justified only by strategic requirements**: sovereignty, latency, regulatory control, or an already-funded datacenter and operations team.
+3. **Do not present on-premises as a cost saving** unless Dell/Broadcom quotes, facilities allocation, staffing, support, and migration effort are included in the approved TCO.
+
+See the full model in [21-OnPrem-VxRail-TCO-2026.md](./21-OnPrem-VxRail-TCO-2026.md).
 
 ## Sources
 

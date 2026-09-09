@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="720" viewBox="0 0 1400 720">
+  <rect width="1400" height="720" fill="#fff8f0"/>
+  <text x="70" y="70" font-family="Arial" font-size="32" font-weight="700" fill="#17233c">Three-year cost: Azure vs buying new VxRail</text>
+  <text x="70" y="110" font-family="Arial" font-size="18" fill="#576273">Full purchase, migration, staffing, facilities, support, and operations included</text>
+  <line x1="210" y1="610" x2="1280" y2="610" stroke="#17233c" stroke-width="2"/>
+  <line x1="210" y1="160" x2="210" y2="610" stroke="#17233c" stroke-width="2"/>
+  <text x="160" y="616" font-family="Arial" font-size="16" fill="#576273">$0</text><text x="125" y="466" font-family="Arial" font-size="16" fill="#576273">$2M</text><text x="125" y="316" font-family="Arial" font-size="16" fill="#576273">$4M</text><text x="125" y="166" font-family="Arial" font-size="16" fill="#576273">$6M</text>
+  <line x1="210" y1="460" x2="1280" y2="460" stroke="#e4d8cc"/><line x1="210" y1="310" x2="1280" y2="310" stroke="#e4d8cc"/><line x1="210" y1="160" x2="1280" y2="160" stroke="#e4d8cc"/>
+  <rect x="310" y="546" width="210" height="64" fill="#3b82a0"/><text x="330" y="535" font-family="Arial" font-size="22" font-weight="700" fill="#17233c">$0.86M</text><text x="335" y="660" font-family="Arial" font-size="22" font-weight="700" fill="#17233c">Azure</text>
+  <rect x="620" y="430" width="210" height="180" fill="#e79a45"/><text x="635" y="419" font-family="Arial" font-size="22" font-weight="700" fill="#17233c">$2.39M</text><text x="645" y="660" font-family="Arial" font-size="22" font-weight="700" fill="#17233c">VxRail low</text>
+  <rect x="930" y="178" width="210" height="432" fill="#d95d55"/><text x="950" y="167" font-family="Arial" font-size="22" font-weight="700" fill="#17233c">$5.75M</text><text x="970" y="660" font-family="Arial" font-size="22" font-weight="700" fill="#17233c">VxRail high</text>
+  <text x="70" y="705" font-family="Arial" font-size="16" fill="#576273">Planning ranges; Azure is a measured bill, on-premises includes new acquisition and full operations.</text>
+</svg>

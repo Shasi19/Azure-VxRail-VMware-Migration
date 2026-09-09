@@ -47,7 +47,21 @@ Migration/
 
 The manager/director presentation pack focused on AKS by environment, migration gates, operations, backup, and DR is [`20-Executive-AKS-Migration-Pack.md`](docs/Azure-VxRail-VMware-Migration/20-Executive-AKS-Migration-Pack.md) (**V2**). The downloadable presentation is [`Executive-AKS-Migration-Pack-2026-V2.docx`](deliverables/Executive-AKS-Migration-Pack-2026-V2.docx).
 
+**V3 - full on-premises TCO:** the new-cluster purchase model, VxRail architecture, operations, patching, staffing, facilities, and migration effort are in [`21-OnPrem-VxRail-TCO-2026.md`](docs/Azure-VxRail-VMware-Migration/21-OnPrem-VxRail-TCO-2026.md), with the colorful Word report at [`OnPrem-VxRail-TCO-2026-V3.docx`](deliverables/OnPrem-VxRail-TCO-2026-V3.docx).
+
 **Version rule:** V1 is retained for historical comparison; V2 is the current decision baseline.
+
+### Downloadable Word Documents
+
+| Version | Document | Download |
+|---|---|---|
+| V1 | Azure/on-premises baseline costing | [Download DOCX](deliverables/Azure-OnPrem-Cost-Comparison-2026-V1.docx) |
+| V2 | Executive AKS migration pack | [Download DOCX](deliverables/Executive-AKS-Migration-Pack-2026-V2.docx) |
+| V3 | Full Dell VxRail purchase, operations, and migration TCO | [Download DOCX](deliverables/OnPrem-VxRail-TCO-2026-V3.docx) |
+| GCP V1 | Standalone GCP versus Azure/on-premises comparison | [Download DOCX](deliverables/GCP-Azure-OnPrem-Comparison-2026.docx) |
+| Legacy | Earlier Azure/on-premises costing document | [Download DOCX](deliverables/Azure-OnPrem-Cost-Comparison-2026.docx) |
+
+GitHub provides a **Download raw file** option from each link. The Markdown reports and colorful SVG graphs are stored beside the documents for browser viewing and review.
 
 ### Separate GCP Workstream
 
