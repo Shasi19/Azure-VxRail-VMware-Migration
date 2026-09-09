@@ -39,6 +39,10 @@ Migration/
 
 ### Start Reading Here → [`00-VxRail-Complete-Index.md`](docs/Azure-VxRail-VMware-Migration/00-VxRail-Complete-Index.md)
 
+### Costing Deliverables
+
+The 2026 workbook reconciliation and on-premises planning estimate are in [`19-Cost-Comparison-2026.md`](docs/Azure-VxRail-VMware-Migration/19-Cost-Comparison-2026.md). The companion Word document is in `deliverables/Azure-OnPrem-Cost-Comparison-2026.docx`.
+
 This index provides:
 - ✅ Role-based reading paths (for architects, DBAs, DevOps, project managers)
 - ✅ Cross-references between all documents
