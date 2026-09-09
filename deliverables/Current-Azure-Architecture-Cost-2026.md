@@ -69,3 +69,17 @@ flowchart TB
 ## Decision
 
 Azure is the best immediate option because it has the lowest migration risk and a measured actual bill. GCP requires a cloud-to-cloud rebuild; on-premises requires capacity expansion and operational ownership. Revisit the decision after Azure optimization and a resource-level reconciliation.
+
+## Official Azure pricing verification links
+
+- [Azure Pricing Calculator](https://azure.microsoft.com/en-us/pricing/calculator/)
+- [AKS pricing](https://azure.microsoft.com/en-us/pricing/details/kubernetes-service/)
+- [Azure Database for PostgreSQL Flexible Server pricing](https://azure.microsoft.com/en-us/pricing/details/postgresql/flexible-server/)
+- [Azure Cosmos DB pricing](https://azure.microsoft.com/en-us/pricing/details/cosmos-db/)
+- [Azure Container Registry pricing](https://azure.microsoft.com/en-us/pricing/details/container-registry/)
+- [Azure Blob Storage pricing](https://azure.microsoft.com/en-us/pricing/details/storage/blobs/)
+- [Azure VPN Gateway pricing](https://azure.microsoft.com/en-us/pricing/details/vpn-gateway/)
+- [Azure Firewall pricing](https://azure.microsoft.com/en-us/pricing/details/azure-firewall/)
+- [Azure Application Gateway pricing](https://azure.microsoft.com/en-us/pricing/details/application-gateway/)
+- [Azure Monitor pricing](https://azure.microsoft.com/en-us/pricing/details/monitor/)
+- [Azure DNS pricing](https://azure.microsoft.com/en-us/pricing/details/dns/)

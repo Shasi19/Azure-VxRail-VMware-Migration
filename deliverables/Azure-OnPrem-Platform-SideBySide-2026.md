@@ -101,3 +101,23 @@ Operational work includes monthly OS patching, quarterly Kubernetes upgrades, Vx
 ## Final justification
 
 Choose **Azure now** because it is running, measurable, and has the lowest transition risk. Choose **existing VxRail expansion** if sovereignty, latency, or regulation requires on-premises; it is preferable to buying a new cluster. Choose **Canonical Kubernetes** when cost and upstream alignment matter, **Rancher Prime** when centralized governance matters, and **OpenShift** when Red Hat enterprise support/compliance outweighs its premium. Choose **GCP** only after a pricing calculator model and Cosmos compatibility proof demonstrate strategic value.
+
+## Official pricing verification
+
+- [Azure Pricing Calculator](https://azure.microsoft.com/en-us/pricing/calculator/)
+- [Azure AKS pricing](https://azure.microsoft.com/en-us/pricing/details/kubernetes-service/)
+- [Azure PostgreSQL Flexible Server pricing](https://azure.microsoft.com/en-us/pricing/details/postgresql/flexible-server/)
+- [Azure Cosmos DB pricing](https://azure.microsoft.com/en-us/pricing/details/cosmos-db/)
+- [Azure Storage pricing](https://azure.microsoft.com/en-us/pricing/details/storage/blobs/)
+- [Azure Monitor pricing](https://azure.microsoft.com/en-us/pricing/details/monitor/)
+- [Google Cloud Pricing Calculator](https://cloud.google.com/products/calculator)
+- [GKE pricing](https://cloud.google.com/kubernetes-engine/pricing)
+- [Cloud SQL pricing](https://cloud.google.com/sql/pricing)
+- [Cloud Storage pricing](https://cloud.google.com/storage/pricing)
+- [Dell VxRail](https://www.dell.com/en-us/shop/servers-storage-and-networking/sf/virtualization/vxrail)
+- [VMware Cloud Foundation](https://www.vmware.com/products/cloud-foundation)
+- [Veeam pricing](https://www.veeam.com/pricing.html)
+- [Red Hat OpenShift pricing](https://www.redhat.com/en/technologies/cloud-computing/openshift/pricing)
+- [SUSE Rancher Prime](https://www.suse.com/products/rancher/)
+- [Canonical Kubernetes](https://ubuntu.com/kubernetes)
+- [Ubuntu Pro pricing](https://ubuntu.com/pricing/pro)

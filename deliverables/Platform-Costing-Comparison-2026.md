@@ -114,3 +114,19 @@ Choose Canonical when minimizing platform subscription cost and staying close to
 ## 6. Recommendation
 
 For this workload and current information, **Azure is the best immediate choice** because it is already operating and its measured subscription cost is known. If on-premises is mandatory, **expand the existing VxRail cluster** after Dell validates memory and N+1 capacity. Use **Canonical Kubernetes** for the lowest commercial platform cost, or **Rancher Prime** when centralized multi-cluster governance justifies the premium. Choose OpenShift only for a clear Red Hat enterprise requirement.
+
+## 7. Official Pricing Verification Links
+
+Use these links to replace planning ranges with current prices or vendor quotes. Prices vary by region, contract term, support tier, core/node entitlement, committed-use discount, and reseller agreement.
+
+| Cost area | Official verification source |
+|---|---|
+| OpenShift subscription | [Red Hat OpenShift pricing](https://www.redhat.com/en/technologies/cloud-computing/openshift/pricing) |
+| SUSE Rancher Prime | [SUSE Rancher Prime](https://www.suse.com/products/rancher/) and [SUSE how to buy](https://www.suse.com/how-to-buy/) |
+| Canonical Kubernetes / Ubuntu Pro | [Canonical Kubernetes](https://ubuntu.com/kubernetes), [Ubuntu Pro pricing](https://ubuntu.com/pricing/pro) |
+| Dell VxRail hardware | [Dell VxRail](https://www.dell.com/en-us/shop/servers-storage-and-networking/sf/virtualization/vxrail) - request configuration quote |
+| VMware/Broadcom vSphere and vSAN | [VMware Cloud Foundation](https://www.vmware.com/products/cloud-foundation) - request entitlement quote |
+| Veeam backup licensing | [Veeam pricing](https://www.veeam.com/pricing.html) |
+| Azure pricing calculator | [Azure Pricing Calculator](https://azure.microsoft.com/en-us/pricing/calculator/) |
+| GCP pricing calculator | [Google Cloud Pricing Calculator](https://cloud.google.com/products/calculator) |
+| AWS comparison reference, if required | [AWS Pricing Calculator](https://calculator.aws/) |

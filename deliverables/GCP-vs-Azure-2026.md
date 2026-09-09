@@ -55,3 +55,24 @@ The GCP range is not a quote. It depends on region, GKE compute mode, Cloud SQL 
 3. Complete a Cosmos DB compatibility proof.
 4. Prove GKE performance, security, restore, and SLOs.
 5. Approve the three-year business case before production migration.
+
+## Official pricing verification links
+
+### Azure
+
+- [Azure Pricing Calculator](https://azure.microsoft.com/en-us/pricing/calculator/)
+- [AKS pricing](https://azure.microsoft.com/en-us/pricing/details/kubernetes-service/)
+- [PostgreSQL Flexible Server pricing](https://azure.microsoft.com/en-us/pricing/details/postgresql/flexible-server/)
+- [Cosmos DB pricing](https://azure.microsoft.com/en-us/pricing/details/cosmos-db/)
+- [Storage pricing](https://azure.microsoft.com/en-us/pricing/details/storage/blobs/)
+- [Monitor pricing](https://azure.microsoft.com/en-us/pricing/details/monitor/)
+
+### GCP
+
+- [Google Cloud Pricing Calculator](https://cloud.google.com/products/calculator)
+- [GKE pricing](https://cloud.google.com/kubernetes-engine/pricing)
+- [Cloud SQL pricing](https://cloud.google.com/sql/pricing)
+- [Cloud Storage pricing](https://cloud.google.com/storage/pricing)
+- [Backup for GKE pricing](https://cloud.google.com/kubernetes-engine/pricing#backup-for-gke)
+
+Cloud provider estimates must be rebuilt with the final region, HA mode, storage retention, traffic, logging, egress, and committed-use assumptions.
