@@ -53,6 +53,8 @@ The manager/director presentation pack focused on AKS by environment, migration 
 
 ### Downloadable Word Documents
 
+For browser viewing without downloading, open the [deliverables Markdown index](deliverables/README.md).
+
 | Version | Document | Download |
 |---|---|---|
 | V1 | Azure/on-premises baseline costing | [Download DOCX](deliverables/Azure-OnPrem-Cost-Comparison-2026-V1.docx) |
