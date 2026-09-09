@@ -183,6 +183,27 @@ For this existing six-node VxRail environment, **Canonical Kubernetes is the low
 
 ## 5. Decision and Next Actions
 
+### Azure vs on-premises side by side
+
+| Factor | Azure existing | Existing VxRail expanded for 35 VMs | New VxRail cluster for 35 VMs |
+|---|---|---|---|
+| Three-year planning cost | $855,144 current bill | $1.53M-$3.99M | $2.39M-$5.75M |
+| One-time migration | Low | $180k-$420k | $180k-$420k |
+| Infrastructure purchase | None | $180k-$510k expansion | $1.04M-$2.39M |
+| Operations | Managed cloud services | 2 FTE minimum; 3-4 FTE realistic | 2 FTE minimum; 3-4 FTE realistic |
+| Main risk | Ongoing monthly spend | 1.52 TB RAM gap and hardware compatibility | Capital, facilities, licensing, and staffing |
+| Recommendation | **Best immediate choice** | **Preferred on-premises route** | Only if expansion is not possible |
+
+### Azure vs GCP side by side
+
+| Factor | Azure existing | GCP migration |
+|---|---|---|
+| Three-year planning cost | $855,144 current bill | Approximately $584k-$1.49M steady-state plus $80k-$195k migration |
+| Migration effort | Low | High; GKE rebuild and Cosmos replacement |
+| Main unknown | Unallocated/shared Azure costs | Cosmos compatibility, egress, logs, Cloud SQL HA, discounts |
+| Best fit | Lowest-risk current operation | GKE, analytics, global networking, or Google commercial strategy |
+| Decision | **Retain and optimize** | POC only after business case and pricing model |
+
 1. Treat **$23,754/month** as the current Azure baseline until Cost Management reconciliation is complete.
 2. Confirm the VxRail memory headroom and worker-node count before ordering or migrating.
 3. Verify existing Veeam VUL and Oracle Linux entitlements; these are the largest variable recurring costs.

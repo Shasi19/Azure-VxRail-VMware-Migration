@@ -1,15 +1,18 @@
-# On-Premises Dell VxRail TCO and Operations (V3)
+# On-Premises Dell VxRail TCO, 35-VM Capacity, and Operations (V4)
 
+**Version:** V4
 **Audience:** CTO, directors, finance, infrastructure, and migration steering committee
 
 ## Executive decision
 
-If a new six-node Dell VxRail cluster must be purchased:
+For the requested 35-VM target:
 
-- Initial purchase and implementation: **$1.04M-$2.39M**.
+- Existing-cluster expansion: **$180k-$510k one time**.
+- New six-node cluster: **$1.04M-$2.39M initial**.
 - Annual operations: **$390k-$980k**.
 - Migration program: **$180k-$420k**.
-- Three-year on-premises TCO: **$2.39M-$5.75M**.
+- Three-year expansion TCO: **$1.53M-$3.99M**.
+- Three-year new-cluster TCO: **$2.39M-$5.75M**.
 - Three-year Azure baseline: **$855,144** at the current `$23,754/month` bill.
 
 ![Three-year cost comparison](../docs/Azure-VxRail-VMware-Migration/assets/onprem-tco-bars.svg)
@@ -28,6 +31,20 @@ flowchart TB
     VEEAM --> NAS[40-60 TB backup repository]
     NAS --> OFFSITE[Immutable offsite copy]
 ```
+
+## 35-VM schedule
+
+| Group | Count | Per VM | Total |
+|---|---:|---|---:|
+| Kubernetes control plane | 3 | 8 vCPU / 32 GB / 150 GB | 3 |
+| Kubernetes workers | 24 | QA 12/48/200 GB; PREPROD 16/64/250 GB; PROD 24/96/300 GB | 24 |
+| PostgreSQL | 7 | QA 8/32/600 GB; PREPROD 16/64/700 GB; PROD 32/128/1.5 TB | 7 |
+| Platform/operations | 10 | 8 vCPU / 32 GB / 250 GB | 10 |
+| **Total** | **35 VM instances** | **35 requested VMs** | **35** |
+
+The total is **35 VM instances**: 18 Kubernetes, 7 database, and 10 platform/operations.
+
+Capacity required is approximately **724 vCPU, 2.90 TB RAM, and 16.6 TB logical storage**. Current reported free capacity is **1.38 TB RAM and 90.86 TB storage**, so memory needs approximately **1.52 TB additional capacity**; storage is sufficient.
 
 ## Full acquisition budget
 
@@ -79,6 +96,6 @@ flowchart TB
 
 ## Recommendation
 
-Remain on Azure and optimize first. Buy a new VxRail cluster only when sovereignty, latency, regulation, or an already-funded datacenter strategy justifies the additional capital and operating burden. Require Dell/Broadcom quotes, facilities approval, 2-4 FTE ownership, capacity validation, database compatibility, and immutable offsite DR before purchase approval.
+Remain on Azure and optimize first. If on-premises is required, expand the existing VxRail cluster with certified RAM and capacity additions first, budgeted at $180k-$510k. Buy a new cluster only if the existing hosts cannot safely support the 35-VM design. Require Dell/Broadcom quotes, facilities approval, 2-4 FTE ownership, capacity validation, database compatibility, and immutable offsite DR.
 
 Full source report: [21-OnPrem-VxRail-TCO-2026.md](../docs/Azure-VxRail-VMware-Migration/21-OnPrem-VxRail-TCO-2026.md)
