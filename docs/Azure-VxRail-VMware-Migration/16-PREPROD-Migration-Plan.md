@@ -102,6 +102,11 @@ PREPROD MIGRATION FLOW
 
 ## Pre-Migration Checklist
 
+- [ ] PREPROD workbook baseline reconciled: 2 x Standard D2s v4 AKS nodes ($189/month), PostgreSQL ($719/month), and Cosmos DB ($132/month).
+- [ ] Selected Kubernetes platform, version, CNI, CSI, ingress, and backup support matrix approved.
+- [ ] Database PITR restore and Patroni failover have both passed before load testing.
+- [ ] No credentials are embedded in scripts or committed to Git.
+
 - [ ] PREPROD K8s cluster: 12 nodes in `Ready` state (`kubectl get nodes`)
 - [ ] Patroni cluster running: 1 Leader + 2 Replicas (`patronictl -c /etc/patroni/patroni.yml list`)
 - [ ] pgBouncer VIP `10.30.0.100` responding (`psql -h 10.30.0.100 -U app_user -c "SELECT 1"`)

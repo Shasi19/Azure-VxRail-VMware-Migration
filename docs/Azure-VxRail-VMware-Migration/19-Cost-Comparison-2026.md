@@ -1,6 +1,7 @@
-# Azure vs On-Premises Cost Comparison - 2026
+# Azure vs On-Premises Cost Comparison - 2026 (V2)
 
 **Prepared:** 2026-09-09  
+**Document version:** V2 - AKS environment costing and Kubernetes platform comparison
 **Source workbook:** `DI_Cost_Optimization_2026.xlsx` (provided separately)  
 **Scope:** Azure resources represented in the workbook and the repository's existing six-node Dell VxRail target
 
@@ -13,6 +14,21 @@ The workbook's resource-detail rows total only **$9,011/month**. They are an opt
 For on-premises, the repository says the six-node VxRail cluster, vSphere/vCenter, existing Veeam deployment, and TOR switching are already present. The migration does not require buying a second compute platform. The common incremental procurement estimate is **$20,000-$45,000 one time**, plus **$3,600-$19,300/year** for backup, OS, and certificate items, excluding migration labor, taxes, and facility costs. If the existing Veeam and OS entitlements cover the migrated workloads, the common incremental annual software cost can be close to **$0**.
 
 ## 1. Current Azure Cost from the Workbook
+
+### AKS and directly related resources by environment
+
+The table below is restricted to Kubernetes and directly adjacent application-platform rows visible in the workbook. It excludes shared subscription costs, networking, storage, backup, monitoring, and resources that are not explicitly attributable to an environment.
+
+| Environment | AKS entries and sizing | AKS cost/month | Directly related rows visible | Related cost/month | Visible platform subtotal/month | Annualized |
+|---|---|---:|---|---:|---:|---:|
+| QA | 3 x Standard D2s v4 (6 vCPU, 24 GiB total) | $284 | Cosmos DB $132; Container Instance $110 (marked for removal) | $242 | **$526** | $6,312 |
+| PREPROD | 2 x Standard D2s v4 (4 vCPU, 16 GiB total) | $189 | PostgreSQL $719; Cosmos DB $132 | $851 | **$1,040** | $12,480 |
+| PROD | 4 x Standard D4s v4 plus 7 x Standard D4as v6 (44 vCPU, 176 GiB total) | **$1,897** | Cosmos DB $132 | $132 | **$2,029** | $24,348 |
+| **Total visible** | **16 AKS nodes** | **$2,370** | **AKS-adjacent rows** | **$1,225** | **$3,595** | **$43,140** |
+
+The `Directly related rows visible` total is **$1,225/month** ($242 + $851 + $132), and the visible platform subtotal is **$3,595/month**. These are not complete environment costs because the workbook detail sheet does not enumerate all shared networking, storage, backup, monitoring, ingress, or subscription-level charges. The workbook's AKS-only total is **$2,370/month** or **$28,440/year**.
+
+The PROD AKS count is the most important reconciliation point: the workbook shows 11 PROD nodes across two AKS rows, while the repository target design uses 12 PROD worker nodes plus 3 shared control-plane nodes. Obtain the AKS export and confirm whether one node is omitted from the workbook detail or whether the on-prem target is intentionally over-sized.
 
 ### Subscription totals
 
@@ -142,6 +158,8 @@ For this existing six-node VxRail environment, **Canonical Kubernetes is the low
 6. Build a complete TCO with facilities, support, staffing, migration labor, and depreciation before final financial approval.
 
 ## Assumptions and Limitations
+
+**Version history:** V1 was the original Azure versus on-premises cost baseline. V2 adds environment-level AKS costing, Kubernetes platform options, executive gates, and corrected migration/DR controls. The V1 baseline remains available as `deliverables/Azure-OnPrem-Cost-Comparison-2026-V1.docx`.
 
 - Currency is USD and the workbook's `Last month cost` values are treated as monthly costs.
 - Azure tax, credits, reservations, egress, and future price changes are not separately modeled.

@@ -41,7 +41,13 @@ Migration/
 
 ### Costing Deliverables
 
-The 2026 workbook reconciliation and on-premises planning estimate are in [`19-Cost-Comparison-2026.md`](docs/Azure-VxRail-VMware-Migration/19-Cost-Comparison-2026.md). The companion Word document is in `deliverables/Azure-OnPrem-Cost-Comparison-2026.docx`.
+**V1 - baseline:** the original Azure/on-premises costing pack is available as [`Azure-OnPrem-Cost-Comparison-2026-V1.docx`](deliverables/Azure-OnPrem-Cost-Comparison-2026-V1.docx).
+
+**V2 - current:** the expanded workbook reconciliation, AKS environment costing, Kubernetes platform comparison, and corrected migration assumptions are in [`19-Cost-Comparison-2026.md`](docs/Azure-VxRail-VMware-Migration/19-Cost-Comparison-2026.md).
+
+The manager/director presentation pack focused on AKS by environment, migration gates, operations, backup, and DR is [`20-Executive-AKS-Migration-Pack.md`](docs/Azure-VxRail-VMware-Migration/20-Executive-AKS-Migration-Pack.md) (**V2**). The downloadable presentation is [`Executive-AKS-Migration-Pack-2026-V2.docx`](deliverables/Executive-AKS-Migration-Pack-2026-V2.docx).
+
+**Version rule:** V1 is retained for historical comparison; V2 is the current decision baseline.
 
 This index provides:
 - ✅ Role-based reading paths (for architects, DBAs, DevOps, project managers)

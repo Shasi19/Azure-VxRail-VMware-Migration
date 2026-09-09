@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="500" viewBox="0 0 1400 500">
+  <rect width="1400" height="500" fill="#f7f3ed"/>
+  <text x="60" y="60" font-family="Arial" font-size="30" font-weight="700" fill="#14213d">Executive migration timeline</text>
+  <text x="60" y="95" font-family="Arial" font-size="17" fill="#53606e">Indicative dates; final dates depend on cost reconciliation, platform selection, and capacity approval.</text>
+  <line x1="120" y1="250" x2="1280" y2="250" stroke="#14213d" stroke-width="6"/>
+  <circle cx="170" cy="250" r="18" fill="#e07a5f"/><circle cx="450" cy="250" r="18" fill="#3d9970"/><circle cx="760" cy="250" r="18" fill="#e0a458"/><circle cx="1080" cy="250" r="18" fill="#14213d"/>
+  <text x="110" y="190" font-family="Arial" font-size="22" font-weight="700" fill="#14213d">Sep 2026</text><text x="90" y="310" font-family="Arial" font-size="17" fill="#53606e">Reconcile workbook</text><text x="90" y="338" font-family="Arial" font-size="17" fill="#53606e">POC and quotes</text>
+  <text x="390" y="190" font-family="Arial" font-size="22" font-weight="700" fill="#14213d">Oct 2026</text><text x="360" y="310" font-family="Arial" font-size="17" fill="#53606e">QA migration</text><text x="360" y="338" font-family="Arial" font-size="17" fill="#53606e">Restore gate</text>
+  <text x="695" y="190" font-family="Arial" font-size="22" font-weight="700" fill="#14213d">Nov 2026</text><text x="665" y="310" font-family="Arial" font-size="17" fill="#53606e">PREPROD</text><text x="665" y="338" font-family="Arial" font-size="17" fill="#53606e">Load and HA gate</text>
+  <text x="1020" y="190" font-family="Arial" font-size="22" font-weight="700" fill="#14213d">Dec 2026+</text><text x="990" y="310" font-family="Arial" font-size="17" fill="#53606e">PROD parallel run</text><text x="990" y="338" font-family="Arial" font-size="17" fill="#53606e">Canary, cutover, hypercare</text>
+</svg>

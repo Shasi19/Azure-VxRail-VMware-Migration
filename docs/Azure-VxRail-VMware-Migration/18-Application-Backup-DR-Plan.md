@@ -65,6 +65,16 @@ FULL BACKUP STACK — WHAT GETS BACKED UP AND HOW
 
 ## RTO and RPO Targets by Service
 
+> **Control correction:** RPO is not automatically zero for logical replication or asynchronous backup. Report the last confirmed replication point and block cutover when lag exceeds the approved threshold.
+
+Additional PROD controls:
+
+- [ ] Immutable offsite backup copy configured and monitored; same-site NAS is not the only copy.
+- [ ] PostgreSQL PITR restore tested from WAL archive.
+- [ ] Kubernetes namespace and PVC restore tested for QA, PREPROD, and PROD before sign-off.
+- [ ] Full VxRail/cluster rebuild exercise completed at least annually for PROD.
+- [ ] Kasten K10 entitlement and supported version recorded for the selected Kubernetes platform.
+
 ```
 ┌────────────────────────┬──────────┬──────────┬──────────────────────────────┐
 │ Service / Component    │ RTO      │ RPO      │ Recovery Method              │

@@ -6,6 +6,13 @@
 > For infrastructure build see [05-QA-Detailed-Implementation.md](./05-QA-Detailed-Implementation.md).
 > For rollback see [09-Rollback-Procedures.md](./09-Rollback-Procedures.md).
 
+## Required Controls Before QA Sign-Off
+
+- [ ] QA AKS cost and node count reconciled to the workbook: 3 x Standard D2s v4, $284/month.
+- [ ] QA Container Instance ($110/month) confirmed unused or retained by the application owner; remove only after approval.
+- [ ] No passwords or tokens are stored in this runbook; use the approved secret manager and one-time credentials.
+- [ ] Namespace restore from Kasten or the selected backup tool completed successfully before PREPROD starts.
+
 ---
 
 ## Migration Flowchart

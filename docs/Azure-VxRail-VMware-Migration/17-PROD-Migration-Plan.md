@@ -98,6 +98,12 @@ WEEK 16: CUTOVER (Friday 4PM–Saturday 4AM)
 
 ## Pre-Migration Checklist
 
+- [ ] Reconcile workbook PROD AKS inventory: 4 x Standard D4s v4 plus 7 x Standard D4as v6, 11 nodes total, $1,897/month.
+- [ ] Resolve the difference between 11 workbook AKS nodes and the 12-worker on-premises target before capacity approval.
+- [ ] Confirm Azure PostgreSQL logical replication / pglogical support for the exact service tier and version; zero-downtime is not approved until this test passes.
+- [ ] Change rollback objective to the last confirmed replication point; do not claim RPO 0 while replication lag can exist.
+- [ ] Immutable offsite backup copy, full restore rehearsal, DNS rollback, certificate, firewall, and external dependency tests completed.
+
 ```
 PROD MIGRATION PRE-FLIGHT (most critical — sign-off required)
 ═══════════════════════════════════════════════════════════════════════
