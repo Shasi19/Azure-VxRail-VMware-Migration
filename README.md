@@ -55,7 +55,7 @@ The manager/director presentation pack focused on AKS by environment, migration 
 
 For browser viewing without downloading, open the [deliverables Markdown index](deliverables/README.md).
 
-The final presentation reports are also available directly: [Current Azure](deliverables/Current-Azure-Architecture-Cost-2026.md), [existing VxRail expansion](deliverables/Existing-VxRail-35VM-TCO-2026.md), [new VxRail purchase](deliverables/New-VxRail-35VM-TCO-2026.md), [GCP vs Azure](deliverables/GCP-vs-Azure-2026.md), and [all-options decision](deliverables/Azure-OnPrem-GCP-Decision-2026.md).
+The final presentation reports are also available directly: [Current Azure](deliverables/Current-Azure-Architecture-Cost-2026.md), [existing VxRail expansion](deliverables/Existing-VxRail-35VM-TCO-2026.md), [new VxRail purchase](deliverables/New-VxRail-35VM-TCO-2026.md), [GCP vs Azure](deliverables/GCP-vs-Azure-2026.md), [all-options decision](deliverables/Azure-OnPrem-GCP-Decision-2026.md), and [detailed platform costing](deliverables/Platform-Costing-Comparison-2026.md).
 
 | Version | Document | Download |
 |---|---|---|

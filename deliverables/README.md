@@ -11,6 +11,7 @@ These reports are readable directly in GitHub. Each report also has a Word versi
 | New VxRail purchase for 35 VMs | [New-VxRail-35VM-TCO-2026.md](./New-VxRail-35VM-TCO-2026.md) | Existing V3 DOCX contains the new-cluster detail |
 | GCP vs Azure | [GCP-vs-Azure-2026.md](./GCP-vs-Azure-2026.md) | [DOCX](./GCP-Azure-OnPrem-Comparison-2026.docx) |
 | All-options decision | [Azure-OnPrem-GCP-Decision-2026.md](./Azure-OnPrem-GCP-Decision-2026.md) | Use as executive decision brief |
+| Detailed platform costing | [Platform-Costing-Comparison-2026.md](./Platform-Costing-Comparison-2026.md) | [Download DOCX](./Platform-Costing-Comparison-2026.docx) |
 | Full VxRail purchase and operations TCO | [OnPrem-VxRail-TCO-2026-V3.md](./OnPrem-VxRail-TCO-2026-V3.md) | [DOCX](./OnPrem-VxRail-TCO-2026-V3.docx) |
 
 The Markdown reports include Mermaid diagrams and linked SVG charts that GitHub can display in the browser. The Word files are retained for formal distribution.
