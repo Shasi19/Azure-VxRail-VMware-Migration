@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="700" viewBox="0 0 1400 700">
+  <rect width="1400" height="700" fill="#f3f7fb"/>
+  <text x="60" y="60" font-family="Arial" font-size="30" font-weight="700" fill="#17324d">Standalone GCP target architecture</text>
+  <text x="60" y="95" font-family="Arial" font-size="17" fill="#53606e">Separate QA, PREPROD, and PROD GKE environments with managed data and recovery services</text>
+  <rect x="50" y="145" width="1300" height="100" rx="14" fill="#17324d"/>
+  <text x="560" y="205" font-family="Arial" font-size="26" font-weight="700" fill="white">Cloud Load Balancing + Cloud DNS + IAM</text>
+  <rect x="70" y="300" width="360" height="210" rx="14" fill="#5c9ead"/>
+  <rect x="520" y="300" width="360" height="210" rx="14" fill="#6fa77a"/>
+  <rect x="970" y="300" width="360" height="210" rx="14" fill="#d99a42"/>
+  <text x="210" y="350" font-family="Arial" font-size="27" font-weight="700" fill="white">QA GKE</text>
+  <text x="125" y="395" font-family="Arial" font-size="18" fill="white">3-node baseline</text><text x="125" y="430" font-family="Arial" font-size="18" fill="white">Smoke and restore tests</text><text x="125" y="465" font-family="Arial" font-size="18" fill="white">Autoscaling 1-3 nodes</text>
+  <text x="645" y="350" font-family="Arial" font-size="27" font-weight="700" fill="white">PREPROD GKE</text>
+  <text x="575" y="395" font-family="Arial" font-size="18" fill="white">Load and HA rehearsal</text><text x="575" y="430" font-family="Arial" font-size="18" fill="white">Cloud SQL HA</text><text x="575" y="465" font-family="Arial" font-size="18" fill="white">Backup and failover gate</text>
+  <text x="1100" y="350" font-family="Arial" font-size="27" font-weight="700" fill="white">PROD GKE</text>
+  <text x="1025" y="395" font-family="Arial" font-size="18" fill="white">Regional cluster</text><text x="1025" y="430" font-family="Arial" font-size="18" fill="white">Canary and SLO gate</text><text x="1025" y="465" font-family="Arial" font-size="18" fill="white">Multi-region backup</text>
+  <rect x="100" y="570" width="250" height="70" rx="10" fill="#ffffff" stroke="#17324d" stroke-width="2"/><text x="145" y="613" font-family="Arial" font-size="18" fill="#17324d">Artifact Registry</text>
+  <rect x="430" y="570" width="250" height="70" rx="10" fill="#ffffff" stroke="#17324d" stroke-width="2"/><text x="490" y="613" font-family="Arial" font-size="18" fill="#17324d">Cloud SQL</text>
+  <rect x="760" y="570" width="250" height="70" rx="10" fill="#ffffff" stroke="#17324d" stroke-width="2"/><text x="795" y="613" font-family="Arial" font-size="18" fill="#17324d">Cloud Storage + Backup</text>
+  <rect x="1090" y="570" width="250" height="70" rx="10" fill="#ffffff" stroke="#17324d" stroke-width="2"/><text x="1110" y="613" font-family="Arial" font-size="18" fill="#17324d">Monitoring + Logging</text>
+</svg>

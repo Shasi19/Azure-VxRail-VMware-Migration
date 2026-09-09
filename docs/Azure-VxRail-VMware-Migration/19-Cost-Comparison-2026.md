@@ -3,17 +3,33 @@
 **Prepared:** 2026-09-09  
 **Document version:** V2 - AKS environment costing and Kubernetes platform comparison
 **Source workbook:** `DI_Cost_Optimization_2026.xlsx` (provided separately)  
-**Scope:** Azure resources represented in the workbook and the repository's existing six-node Dell VxRail target
+**Scope:** Only services explicitly present in the repository's current Azure architecture; unrelated workbook rows are excluded from the migration cost view.
 
 ## Executive Summary
 
 The workbook's authoritative last-month Azure total is **$23,754/month** or **$285,048/year**. This is the total on the `Cost Summary` sheet, not the larger illustrative figures in older repository documents. The workbook is a real usage/cost snapshot; the repository's older `$60,500/month` table should be treated as a planning scenario until reconciled against Azure Cost Management exports.
 
-The workbook's resource-detail rows total only **$9,011/month**. They are an optimization worklist, not a complete invoice reconciliation: several subscription totals have no corresponding detail rows. This report therefore uses **$23,754/month** for the Azure baseline and uses the detail rows only to identify right-sizing and cleanup actions.
+The workbook's resource-detail rows total only **$9,011/month**, but that is not the migration scope. Several rows are not named in the current architecture, while several documented architecture services do not have a dedicated workbook row. This report therefore uses **$23,754/month** only as the financial control total and uses an architecture-scope view for migration decisions.
 
 For on-premises, the repository says the six-node VxRail cluster, vSphere/vCenter, existing Veeam deployment, and TOR switching are already present. The migration does not require buying a second compute platform. The common incremental procurement estimate is **$20,000-$45,000 one time**, plus **$3,600-$19,300/year** for backup, OS, and certificate items, excluding migration labor, taxes, and facility costs. If the existing Veeam and OS entitlements cover the migrated workloads, the common incremental annual software cost can be close to **$0**.
 
-## 1. Current Azure Cost from the Workbook
+## 1. Architecture-Scope Azure Cost from the Workbook
+
+### Current architecture inventory used for costing
+
+The current-state architecture explicitly contains:
+
+- Three AKS clusters: QA, PREPROD, and PROD.
+- Azure Database for PostgreSQL 13 with HA, backup, and a DR read replica.
+- Azure Cosmos DB using the MongoDB API with multi-region replication.
+- Azure Storage Accounts for application data, logs, backups, and artifacts.
+- Azure Container Registry Premium.
+- Veeam Backup & Replication and Azure backup storage.
+- Azure Monitor, Application Insights, Log Analytics, Prometheus/Grafana, and an ELK stack.
+- VNets, NSGs, ExpressRoute, VPN Gateway, Azure Bastion, Azure Traffic Manager, Application Gateway/WAF, Azure DNS, and Key Vault.
+- Approximately 25 containerized microservices, including Redis and RabbitMQ workloads inside AKS.
+
+Only workbook rows that map directly to this inventory are included in the architecture-scope cost view. Rows for unidentified VMs, unrelated subscriptions, or resources not described in the current architecture are excluded until an owner maps them to a named service.
 
 ### AKS and directly related resources by environment
 
@@ -30,6 +46,23 @@ The `Directly related rows visible` total is **$1,225/month** ($242 + $851 + $13
 
 The PROD AKS count is the most important reconciliation point: the workbook shows 11 PROD nodes across two AKS rows, while the repository target design uses 12 PROD worker nodes plus 3 shared control-plane nodes. Obtain the AKS export and confirm whether one node is omitted from the workbook detail or whether the on-prem target is intentionally over-sized.
 
+### Architecture-scope cost mapping
+
+| Current architecture service | Workbook rows included | Visible monthly cost | Scope treatment |
+|---|---|---:|---|
+| AKS QA, PREPROD, PROD | Three AKS rows plus the second PROD AKS row | **$2,370** | Included; primary Kubernetes compute |
+| PostgreSQL managed service | `psql-ae-preprod-we-001` | **$719** | Included; only named PostgreSQL row visible, so QA/PROD costs require Azure export reconciliation |
+| Cosmos DB MongoDB API | QA, PREPROD, PROD Cosmos rows | **$396** | Included; maps directly to the documented Cosmos service |
+| Azure Storage Accounts | `druacrps1`, `paldata`, `diveeamrepository` | **$2,298** | Included; application and backup storage rows with explicit architecture relationship |
+| Azure managed disk | Named 2 TB `scout2` disk | **$330** | Included only as storage capacity to be mapped; do not assume it belongs to AKS until owner confirmation |
+| ACR Premium | No dedicated matching row in the visible detail list | **Not separately identifiable** | Included in architecture scope, but cost must come from Cost Management export |
+| Monitoring, Application Insights, Log Analytics, ELK | No dedicated matching row in visible detail list | **Not separately identifiable** | Included in architecture scope, but cost must come from Cost Management export |
+| VNet, ExpressRoute, VPN, Bastion, Traffic Manager, Application Gateway/WAF, DNS, Key Vault | Bastion row is visible; other services are not separately identified | **Bastion $239; remainder not separately identifiable** | Included in architecture scope; do not allocate unrelated networking rows without resource mapping |
+| Redis, RabbitMQ, microservices | Runs inside AKS; no standalone service rows | **Included in AKS compute** | Do not add standalone compute unless billed as separate managed services |
+| **Visible architecture-mapped subtotal** | **Only directly mapped rows above** | **$6,352** | **Partial scope floor, not a complete bill** |
+
+The architecture-mapped subtotal is a planning floor: `$2,370` AKS + `$719` PostgreSQL + `$396` Cosmos DB + `$2,298` mapped storage + `$330` mapped disk + `$239` Bastion = **$6,352/month**. It is intentionally different from both the `$9,011` visible workbook-detail subtotal and the `$23,754` subscription total. The difference must be reconciled using Azure Cost Management by resource ID and tag before comparing Azure with on-premises or GCP.
+
 ### Subscription totals
 
 | Subscription | Last month cost | Annualized |
@@ -43,27 +76,23 @@ The PROD AKS count is the most important reconciliation point: the workbook show
 | Sub-DI-VLAB-WE | $397 | $4,764 |
 | **Total** | **$23,754** | **$285,048** |
 
-### Resource-detail items visible in the workbook
+### Workbook rows excluded from architecture-scope costing
 
-| Resource category | Visible monthly cost | Key observations |
+| Workbook row/category | Cost | Why excluded from the current architecture scope |
 |---|---:|---|
-| PostgreSQL | $719 | Preprod is at 20% max CPU and 36% max memory; resize is recommended. |
-| Kubernetes services | $2,370 | QA, preprod, and prod entries recommend autoscaling; a second prod entry exists in another subscription. |
-| Cosmos DB | $396 | All three entries have low utilization and recommend reducing memory. |
-| Container instance | $110 | QA instance is marked as a likely unused resource; validate and remove. |
-| Bastion | $239 | Resize from Standard to Basic is recommended. |
-| Virtual machines | $2,047 | Several VMs are at 99-100% CPU but low memory; resize only after workload validation. |
-| Storage and disk | $2,628 | Includes approximately 8 TB, 4 TB, 2 TB, and 65 TB items; apply lifecycle and housekeeping policies. |
-| **Visible detail subtotal** | **$9,011** | Not equal to the $23,754 subscription total; do not use as the Azure bill baseline. |
+| Unidentified virtual machines | $2,047 | The current architecture names specific Veeam/ELK VMs, but these workbook VM names are not mapped to them. Exclude until resource ownership is confirmed. |
+| QA Container Instance | $110 | Container Instance is not part of the documented current architecture; validate with the application owner before removal or inclusion. |
+| Unmapped storage/disk rows | Included only where explicitly mapped above | Do not include a storage row merely because it is in the workbook; map it to application data, logs, artifacts, or backup first. |
+| Full visible detail subtotal | $9,011 | Retained only as a workbook reconciliation control, not as the architecture-scope migration total. |
 
 ### Workbook actions to validate before migration
 
-1. Export the same billing period from Azure Cost Management and reconcile it to the seven subscription totals.
-2. Confirm whether the seven subscriptions include shared services or resources omitted from `Resource details`.
+1. Export the same billing period from Azure Cost Management and map each resource ID to the current architecture inventory.
+2. Confirm whether the seven subscriptions include shared services or resources omitted from `Resource details`; do not assign them to the migration scope without an owner and architecture mapping.
 3. Apply autoscaling to the Kubernetes services after setting minimum and maximum counts with the application team.
 4. Validate the unused QA container instance before removal.
-5. Apply lifecycle management to the 8 TB, 4 TB, and 65 TB storage accounts, and clean the 2 TB disk after utilization review.
-6. Do not reduce the high-CPU VMs solely because memory is low; confirm CPU saturation, latency, and application SLAs first.
+5. Apply lifecycle management only to architecture-mapped application and backup storage, and clean the 2 TB disk after utilization review.
+6. Do not reduce or migrate the high-CPU VMs until they are mapped to a named current-architecture component and their SLA is confirmed.
 
 ## 2. On-Premises Resource Requirements
 

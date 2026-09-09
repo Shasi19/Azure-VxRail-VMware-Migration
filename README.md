@@ -49,6 +49,10 @@ The manager/director presentation pack focused on AKS by environment, migration 
 
 **Version rule:** V1 is retained for historical comparison; V2 is the current decision baseline.
 
+### Separate GCP Workstream
+
+GCP analysis is intentionally maintained separately under [`docs/GCP-Migration/`](docs/GCP-Migration/). Start with [`01-GCP-Architecture-and-Cost.md`](docs/GCP-Migration/01-GCP-Architecture-and-Cost.md) and [`02-GCP-Executive-Decision.md`](docs/GCP-Migration/02-GCP-Executive-Decision.md). The standalone Word presentation is [`GCP-Azure-OnPrem-Comparison-2026.docx`](deliverables/GCP-Azure-OnPrem-Comparison-2026.docx).
+
 This index provides:
 - ✅ Role-based reading paths (for architects, DBAs, DevOps, project managers)
 - ✅ Cross-references between all documents
